@@ -1,10 +1,11 @@
 import {el,api} from '../ui.js';
 
 // Limit unattended foreground time. Continued interaction extends the reading window.
-const attentiveFor=45000;
+const attentiveFor=75000;
+export function activeSlice(cursor,now,lastInput,engaged) {
+  return engaged ? Math.max(0,Math.min(now,lastInput+attentiveFor)-cursor) : 0;
+}
 export function setup(ui) {
-  let stop;
-  ui.on('leave',async ()=>{if(stop){const cleanup=stop;stop=undefined;await cleanup();}});
   ui.on('reader',context=>{
     const {story,position}=context;
     const chapter=position.chapter;
@@ -14,7 +15,7 @@ export function setup(ui) {
     const writes=new Set();
     function advance(){
       const now=performance.now();
-      if(engaged)accrued+=Math.max(0,Math.min(now,lastInput+attentiveFor)-cursor);
+      accrued+=activeSlice(cursor,now,lastInput,engaged);
       cursor=now;
     }
     function flush(){
@@ -40,7 +41,7 @@ export function setup(ui) {
     window.addEventListener('pagehide',()=>flush().catch(()=>{}),options);
     const timer=setInterval(()=>flush().catch(e=>ui.notice(e.message)),10000);
     context.flushActiveTime=flush;
-    stop=async ()=>{clearInterval(timer);controller.abort();await flush().catch(e=>ui.notice(e.message));};
+    context.onLeave(async ()=>{clearInterval(timer);controller.abort();await flush();});
   });
   ui.on('home',async ({root})=>{
     const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;

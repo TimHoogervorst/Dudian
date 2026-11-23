@@ -15,8 +15,8 @@ export default async function flashcards({req,url,store,body,json}: Context) {
     return true;
   }
   if (req.method==='POST' && match[2]) {
-    const {index,grade} = await body();
-    json(200,gradeCard(store.db,match[1],index,grade));
+    const {index,grade,zone} = await body();
+    json(200,gradeCard(store.db,match[1],index,grade,Date.now(),zone));
     return true;
   }
   return false;

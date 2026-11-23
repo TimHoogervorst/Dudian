@@ -1,12 +1,19 @@
 import {ui,el,link,api} from './ui.js';
-export async function reader({root,parts}) {
+import {trackParagraph} from './paragraph-scroll.js';
+export async function reader({root,parts,signal,onLeave}) {
   const id=parts[0]||'tea-shop';
   const endpoint='/api/stories/'+encodeURIComponent(id);
-  const {story,position}=await api(endpoint);
+  const {story,position}=await api(endpoint,undefined,signal);
+  if(signal.aborted)return;
   if(parts[1]!==undefined) {
     const chapter=Number(parts[1]);
     if(!Number.isInteger(chapter)||!story.chapters[chapter])throw Error('Unknown chapter.');
-    if(chapter!==position.chapter)Object.assign(position,await api(endpoint+'/position',{chapter,paragraph:0}));
+    if(chapter!==position.chapter){
+      const change=api(endpoint+'/position',{chapter,paragraph:0});
+      onLeave(()=>change);
+      Object.assign(position,await change);
+      if(signal.aborted)return;
+    }
   }
   const chapter=story.chapters[position.chapter];
   const grid=el('div',null,'reader-grid');
@@ -45,28 +52,48 @@ export async function reader({root,parts}) {
   const aside=el('aside',null,'dictionary');
   aside.append(el('h2','Dictionary'),el('p','Select a word to read its meaning.'));
   center.append(article,controls);grid.append(contents,center,aside);root.append(grid);
-  const context={root,story,position,article,aside,controls,chapter};
+  const context={root,story,position,article,aside,controls,chapter,signal,onLeave};
+  const tracking=trackParagraph(()=>Array.from(article.children,p=>p.getBoundingClientRect()),()=>window.innerHeight,p=>move(p,false));
   function showPosition(scroll) {
     [...article.children].forEach((p,i)=>p.classList.toggle('current-paragraph',i===position.paragraph));
     where.textContent='Paragraph '+(position.paragraph+1)+' of '+chapter.paragraphs.length;
     prev.disabled=!position.paragraph;next.disabled=position.paragraph===chapter.paragraphs.length-1;
-    if(scroll)article.children[position.paragraph]?.scrollIntoView({block:'nearest'});
+    if(scroll){
+      tracking.programmatic();
+      article.children[position.paragraph]?.scrollIntoView({block:'nearest'});
+    }
   }
-  let writing=false;
-  async function move(p) {
-    if(writing||p===position.paragraph)return;
-    writing=true;
-    try {
-      const previous={...position};
-      Object.assign(position,await api(endpoint+'/position',{chapter:position.chapter,paragraph:p}));
-      showPosition(true);
-      await ui.emit('position',{...context,previous});
-    } finally { writing=false; }
+  let writing=Promise.resolve();
+  function move(p,scroll) {
+    if(p===position.paragraph || !chapter.paragraphs[p])return writing;
+    const previous={...position};
+    position.paragraph=p;
+    showPosition(scroll);
+    const update={...position};
+    writing=writing.catch(()=>{}).then(()=>api(endpoint+'/position',update,undefined,true))
+      .then(()=>ui.emit('position',{...context,previous}));
+    writing.catch(error=>ui.notice(error.message));
+    return writing;
   }
-  prev.onclick=()=>move(position.paragraph-1);
-  next.onclick=()=>move(position.paragraph+1);
-  article.addEventListener('click',e=>{ const p=e.target.closest('p');if(p)void move(Number(p.dataset.paragraph)); });
-  showPosition(position.paragraph>0);
+  prev.onclick=()=>move(position.paragraph-1,true);
+  next.onclick=()=>move(position.paragraph+1,true);
+  article.addEventListener('click',e=>{
+    const p=e.target.closest('p');
+    if(p){tracking.programmatic();void move(Number(p.dataset.paragraph),false);}
+  });
+  onLeave(()=>{tracking.flush();return writing;});
+  const options={passive:true,signal};
+  for(const e of ['wheel','touchmove'])window.addEventListener(e,tracking.intent,options);
+  window.addEventListener('pointerdown',e=>{if(e.clientX>=document.documentElement.clientWidth)tracking.intent();},options);
+  window.addEventListener('keydown',e=>{
+    if(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End',' '].includes(e.key))tracking.intent();
+  },options);
+  window.addEventListener('scroll',tracking.scrolled,options);
+  window.addEventListener('pagehide',tracking.flush,options);
+  showPosition(false);
   await ui.emit('reader',context);
+  if(signal.aborted)return;
+  showPosition(position.paragraph>0);
+  await ui.emit('reader-ready',context);
 }
 

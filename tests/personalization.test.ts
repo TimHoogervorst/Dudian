@@ -9,6 +9,19 @@ import { startSession, gradeCard } from '../src/flashcards.ts';
 import { generateStory } from '../src/story-generation.ts';
 
 const day = 86_400_000;
+test('a learner with only strong words reviews the least recently practiced eligible word',t=>{
+  const store=new ReadingStore();t.after(()=>store.db.close());
+  for(const [i,word] of ['茶','水','我'].entries()){
+    for(const date of [day,2*day,3*day,4*day]){
+      const session=startSession(store.db,{kind:'word',words:[word]});
+      gradeCard(store.db,session.id,0,'correct',date+i*1000);
+    }
+  }
+  assert.deepEqual(buildPlan(store,'medium',10,5*day).reviewWords,['茶']);
+  const line=store.story('tea-shop').chapters[0].paragraphs[0];
+  recordAction(store,{storyId:'tea-shop',chapter:0,paragraph:0,token:line.findIndex(t=>t.text==='茶'),id:'tea',kind:'difficulty'},5*day);
+  assert.deepEqual(buildPlan(store,'medium',10,5*day+1).reviewWords,['水']);
+});
 test('marked words remain available as background, then become deliberate review targets exactly one day later', async t => {
   const store = new ReadingStore();
   t.after(()=>store.db.close());

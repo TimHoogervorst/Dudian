@@ -5,6 +5,19 @@ import {startSession,gradeCard,readSession} from '../src/flashcards.ts';
 import {strengthFor} from '../src/strength.ts';
 import {catalog} from '../src/catalog.ts';
 
+test('recall after local midnight earns another-day credit within the same UTC date', t=>{
+  const store=new ReadingStore();t.after(()=>store.db.close());
+  for(const [word,zone,expected] of [['茶','Europe/Amsterdam',7],['水',undefined,5]] as const){
+    for(const iso of ['2026-11-23T22:50:00Z','2026-11-23T23:01:00Z']){
+      const session=startSession(store.db,{kind:'word',words:[word]});
+      gradeCard(store.db,session.id,0,'correct',Date.parse(iso),zone);
+    }
+    assert.equal(strengthFor(store.db,'word',word).score,expected);
+  }
+  const session=startSession(store.db,{kind:'word',words:['茶']});
+  assert.throws(()=>gradeCard(store.db,session.id,0,'correct',Date.now(),'not/a-zone'),/time zone/i);
+});
+
 test('a fresh learner can open either deck or review only a particular compound', t => {
   const store = new ReadingStore();
   t.after(()=>store.db.close());

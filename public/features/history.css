@@ -5,7 +5,7 @@
 .shelf-heading h2{margin:.5rem 0}
 .story-shelf{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:1rem;padding:0;list-style:none}
 .shelf-item{display:flex;align-items:center;gap:1rem;border:1px solid var(--line);border-radius:14px;background:#fff6e8;overflow:hidden;min-height:80px;padding-right:1rem}
-.shelf-art{align-self:stretch;aspect-ratio:1.6;max-width:35%;min-width:80px;background-size:320% auto;background-position:28% 36%}
+.shelf-art{align-self:stretch;flex:0 0 80px;background-size:auto 310%;background-position:27% 32%}
 .shelf-copy{display:grid;gap:.3rem;padding:.8rem 0}.shelf-copy:first-child{padding-left:1rem}
 .shelf-copy strong{font-size:1.25rem}.story-state{font: .85rem var(--sans);color:var(--muted)}.shelf-arrow{margin-left:auto}
 @media(max-width:760px){.dashboard-overview{display:flex;flex-direction:column}.home-week{order:-1}.story-shelf{grid-template-columns:1fr}}

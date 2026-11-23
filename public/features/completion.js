@@ -4,7 +4,8 @@ export function setup(ui) {
   ui.on('reader',async context=>{
     const {story,position,controls}=context;
     const base='/api/stories/'+encodeURIComponent(story.id);
-    const state=await api(base+'/completion');
+    const state=await api(base+'/completion',undefined,context.signal);
+    if(context.signal.aborted)return;
     const finish=el('button','Finish chapter','button');
     const footer=el('div',null,'finish-actions');controls.append(footer);
     function show(result) {
@@ -25,6 +26,7 @@ export function setup(ui) {
         await context.flushWordActions?.();
         await context.flushActiveTime?.();
         const result=await api(base+'/complete',{chapter:position.chapter});
+        if(context.signal.aborted)return;
         show(result);
         await ui.emit('finished',{...context,completion:result});
         if(result.finished && ui.routes.has('summary'))ui.navigate('/summary/'+encodeURIComponent(story.id));

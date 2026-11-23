@@ -54,9 +54,12 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
     const history=attemptsByItem.get(item.kind+'/'+item.text);
     const seen=reading.seen.get(word??'');
     return {...item,word,count:(history?.count??0)+(seen?.count??0),at:Math.max(history?.at??0,seen?.at??0,lastMark.get(word??'')??0)};
-  }).filter(item=>item.word && eligible(item.word) && item.score<6)
+  }).filter(item=>item.word && eligible(item.word));
+  const learning=candidates.filter(item=>item.score<6)
     .sort((a,b)=>a.score-b.score || a.count-b.count || a.at-b.at || a.text.localeCompare(b.text));
-  const reviews=[...new Set(candidates.map(i=>i.word!))];
+  const fallback=candidates.filter(item=>item.kind==='word')
+    .sort((a,b)=>a.at-b.at || a.count-b.count || a.text.localeCompare(b.text))[0];
+  const reviews=learning.length ? [...new Set(learning.map(i=>i.word!))] : fallback ? [fallback.word!] : [];
   const difficult=new Set(candidates.filter(i=>i.score<0).map(i=>i.word));
   const reviewWords=reviews.slice(0,3);
   const slots=Math.max(0,ceiling-Math.min(ceiling,difficult.size));

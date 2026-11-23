@@ -43,7 +43,8 @@ function draw(root,session) {
     if (busy) return;
     busy=true;
     try {
-      const next = await api('/api/flashcards/sessions/'+session.id+'/grade',{index:session.index,grade:value});
+      const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const next = await api('/api/flashcards/sessions/'+session.id+'/grade',{index:session.index,grade:value,zone});
       draw(root,next);
       root.querySelector('button,a.button')?.focus();
     } finally {busy=false;}
