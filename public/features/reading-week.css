@@ -1,0 +1,9 @@
+.home-week{border:1px solid var(--line);border-radius:18px;background:#fff6e8;padding:clamp(16px,2.1vw,30px);align-self:stretch}
+.home-week h2{font-size:clamp(26px,2.3vw,36px)}
+.week-days{display:flex;padding:0;justify-content:space-between;gap:5px;list-style:none;max-width:420px}
+.week-days li{display:flex;flex-direction:column;align-items:center;gap:6px;font:11px var(--sans);color:var(--muted)}
+.day-circle{display:block;width:clamp(16px,1.6vw,24px);aspect-ratio:1;border:1.5px solid #be8d75;border-radius:50%}
+.week-light .day-circle{background:#e8aca1}.week-full .day-circle{background:var(--red);border-color:var(--red)}
+.week-days [aria-current=date]{font-weight:700;color:var(--ink)}
+.week-total{border-top:1px solid var(--line);margin:20px 0 0;padding-top:14px;color:var(--red);font:600 18px var(--serif)}
+

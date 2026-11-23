@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { join, extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ReadingStore, HttpError } from './store.ts';
+import {markAdvance} from './activity.ts';
 
 const root = fileURLToPath(new URL('../',import.meta.url));
 const publicDir = join(root,'public');
@@ -56,7 +57,14 @@ export async function createApp(store: ReadingStore) {
       if (match && !match[2] && req.method==='GET') return json(200,{story:store.story(match[1]),position:store.position(match[1])});
       if (match && match[2] && req.method==='POST') {
         const {chapter,paragraph}=await ctx.body();
-        return json(200,store.move(match[1],chapter,paragraph));
+        const previous=store.position(match[1]);
+        store.db.exec('BEGIN IMMEDIATE');
+        try {
+          const position=store.move(match[1],chapter,paragraph);
+          if(previous.chapter!==chapter||previous.paragraph!==paragraph)markAdvance(store,match[1],chapter);
+          store.db.exec('COMMIT');
+          return json(200,position);
+        }catch(error){store.db.exec('ROLLBACK');throw error;}
       }
       if (req.method!=='GET' && req.method!=='HEAD') return json(405,{error:'Method unavailable.'});
       const artwork = path==='/art/tea-shop.png';
