@@ -1,0 +1,81 @@
+# Chinese reading app
+
+## Product brief
+
+An open-source TypeScript web app runs locally in Docker with one seeded admin learner. Desktop and mobile share that learner’s progress. Use the Sign in with ChatGPT preview for story generation, subject to a successful end-to-end account test. The first release focuses on reading. Speaking and Listening appear as disabled practice choices.
+
+### The reading loop
+
+1. Start on a dashboard showing reading activity and progress. Put Practice, Library, and Settings in the bottom navigation on mobile and at the top on desktop.
+2. Choose Practice → Reading and request a short or long story. Aim for about 10 or 30 minutes of practice, including rereading and lookups. Divide long stories into resumable chapters. The method for estimating duration is open.
+3. Choose Easy, Medium, or Hard when generating a story. Tailor the story to introduce new characters or revisit material the learner struggles with or has had little practice reading. A story at any difficulty may focus entirely on review. Preview the new characters with their meanings and pronunciations before reading.
+4. Validate the entire story before showing its introduction. Check the promised targets and vocabulary budget, then save its chapters and word annotations together so resumed sessions show the same text.
+   Show simplified Chinese with small pinyin controlled by a persistent Settings preference. A single tap on a word reveals its English meaning in the sentence. A double-tap explicitly marks difficulty with that word.
+5. Save the story. On completion, show progress and the items the learner struggled with. Store the optional thumbs-up or thumbs-down rating for later analysis.
+
+### Story targets
+
+Easy allows up to two distinct new characters, Medium up to three, and Hard up to five across the whole story. Settings stores the learner’s preferred difficulty and editable ceilings. Choosing a different difficulty for a session overrides the default for that story.
+
+HSK 1 words are available as background vocabulary from day one. The first story can select characters from this pool to teach deliberately. Other background characters remain unseen until encountered. Later stories can introduce characters from the next level as explicit targets.
+
+A story may introduce one additional unfamiliar compound made entirely from familiar characters. Preview it as a whole word. Give each story an explicit review goal when prior practice is available. Show “New this story” with pronunciation, meaning, and a word containing each target character. Show “Practice again” for review items and reuse them in different sentences. Viewing the introduction earns no reading credit.
+
+### Generating a story
+
+The backend selects background vocabulary, eligible review targets, new material, and the length target before requesting a story. Include that plan in the prompt. Require each sentence as an ordered sequence of word and punctuation entries. Preserve the approved segmentation in storage and render entries together as natural Chinese. Each word occurrence must lead to its contextual dictionary information.
+
+Each word occurrence identifies a dictionary entry and the sense intended in that sentence. Resolve pinyin and English meaning from the dictionary. Validate that the entry matches the written form and contains the selected sense. The model chooses the meaning in context. Reader actions and word flashcards refer to the same word identity.
+
+When validation fails, return specific errors and request a revision of the affected chapter. Allow up to two automatic correction attempts across the story and revalidate the complete story after each. If validation still fails, offer a manual retry. Generation and retries leave learner scores untouched.
+
+Estimate short and long story lengths provisionally at first. After several completed chapters, use the learner’s active reading time, including definition checks, to adjust future lengths. Difficulty controls the vocabulary budget independently.
+
+### Library and review
+
+Favor unseen HSK 1 material first. Once the learner reads recent HSK 1 stories comfortably and has few unresolved review items, occasionally introduce HSK 2 targets even if some HSK 1 entries are still gray. A word becomes eligible for deliberate story review 24 hours after its difficulty mark. During that interval it can occur naturally as background vocabulary and remains available for Library practice.
+
+Provide separate Characters and Words views. A character entry shows its readings, meanings, and examples of words that use it. A word entry shows its pronunciation, meaning, and component characters with their readings. Track character and word flashcards separately. Difficulty with a word brings that whole word back for review.
+
+Start every new learner at HSK 1 in the six-level curriculum. All entries begin unseen. A starting-level selector or placement test is a possible later addition.
+
+Assign each character to the earliest curriculum level containing a word that uses it. Show examples from the learner’s level first. In a word entry, display each character’s pronunciation in that word and link to its other readings and uses.
+
+A difficulty mark immediately lowers the selected word’s reading strength. The occurrence appears in its characters’ usage histories while their strength scores stay intact. A single-tap lookup carries no difficulty penalty or review timer and excludes that word from the chapter’s unaided-reading gain. On chapter completion, award a small gain once per distinct word read unaided. Opening a chapter awards no credit. An explicit flashcard judgment carries more weight than an unaided chapter encounter.
+
+Group material under HSK levels 1–6. Use green for strong reading knowledge, yellow for uncertain, red for struggling, and gray for unseen. Mix strong items with weaker items in flashcard practice. Reveal pronunciation and meaning on request. Support self-assessment as correct, almost, or incorrect, with right, down, or left swipes respectively.
+
+Completing a chapter containing a compound records an encounter with its component characters. A character’s first such encounter moves it from gray to yellow. Reading the character as a standalone word or reviewing its character flashcard builds evidence of independent recognition.
+
+Green requires repeated success. A first correct flashcard answer leaves an unseen item yellow. Successful recall on another day carries more weight, and repeated unaided reading can bring a word to green. An incorrect first flashcard answer can turn an unseen item red. A miss on an established item lowers its strength while preserving prior evidence.
+
+Start separate Characters or Words sessions of up to ten cards. Favor weaker items and mix in familiar ones. Offer Incorrect, Almost, and Got it buttons on desktop and mobile, with mobile swipe shortcuts. Almost covers partial recall of pronunciation or meaning.
+
+An explicit Finish chapter action awards the chapter’s automatic reading gains once per learner. Rereading, refreshing, or finishing the same chapter on another device cannot award those gains again. Learners can still mark a difficult word on a later reading.
+
+### Presentation
+
+Show Start reading on the first visit. When a story is in progress, show Continue reading with its title and chapter. Resume at the saved paragraph across devices. Practice remains available for starting a new story.
+
+Place Recent stories below the main dashboard card. See all opens the complete story history, with each saved story labeled In progress or Finished.
+
+Show one circle per day in the weekly reading view. Fully color a day when the learner finishes at least one story. Use a lighter fill for a day when the learner reads without finishing a story. Leave inactive days empty. If a story spans two days, the earlier reading day keeps its lighter fill and the completion day gets full color.
+
+A day qualifies for light fill when the learner advances to another paragraph, checks a word, marks a difficulty, or spends one active minute in the reader. Opening and immediately closing a story leaves the day empty. Show one numeric summary for the week, the number of stories finished. The circles convey daily activity.
+
+At story completion, show each explicitly marked word alongside the sentence where the learner marked it. Offer Practice these words when there are marked words. This learner-initiated flashcard session is available immediately. Collect the optional thumbs-up or thumbs-down story rating separately.
+
+The supplied illustrations establish the warm paper palette, deep red controls, and responsive chapter layout. The desktop reference places the chapter list beside the reading column and opens a dictionary alongside it. Generate the text first. Artwork and audio in the references are outside the current reading discussion.
+
+### UI reference screenshots
+
+- [Mobile dashboard, story list, reader, and word card](<Street Talk Mandarin reading app screens.png>)
+- [Mobile chapter reader](<A Rainy Afternoon Story.png>)
+- [Desktop chapter reader with chapter list and dictionary](<Rainy Afternoon Tea Shop Reader-1.png>)
+- [Desktop reading dashboard](<Street Talk reading week dashboard-2.png>)
+
+## Local data and persistence
+
+Bundle pinned versions of CC-CEDICT and the six-level HSK vocabulary lists with the app. Include source versions, attribution, and license notices. Saved stories retain their word annotations so dictionary lookups and flashcards work while the Docker app is running, even when the AI service is unavailable.
+
+Store stories, reading positions, and learner progress in a single backend SQLite database on a persistent Docker volume. Desktop and mobile use the same learner record. Rebuilding the container preserves progress when the volume is retained.
