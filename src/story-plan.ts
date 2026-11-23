@@ -1,5 +1,5 @@
-import { catalog } from './catalog.ts';
 import { targetWordCount } from './pace.ts';
+import { vocabularyFor } from './vocabulary-plan.ts';
 import { HttpError, type ReadingStore } from './store.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
@@ -38,15 +38,9 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
   return preferences;
 }
 
-export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: 10 | 30): StoryPlan {
+export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: 10 | 30,now=Date.now()): StoryPlan {
   if (!difficulties.includes(difficulty) || ![10,30].includes(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
   const ceiling = getPreferences(store).ceilings[difficulty];
-  const background = catalog.list('word',1).map(word => word.text);
-  // A standalone word is an unambiguous example for a first character lesson.
-  const common = ['茶','水','家','人','书','好','看','吃','来','去'];
-  const candidates = [...new Set([...common,...background])].filter(word =>
-    background.includes(word) && [...word].length === 1 && catalog.get('character',word));
-  const newCharacters = candidates.slice(0,ceiling);
   return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:targetWordCount(store,minutes),
-    ceiling,background,newCharacters,newWords:[...newCharacters],reviewWords:[]};
+    ceiling,...vocabularyFor(store,ceiling,now)};
 }
