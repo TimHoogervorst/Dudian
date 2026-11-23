@@ -1,3 +1,4 @@
+import { targetWordCount } from './pace.ts';
 import { vocabularyFor } from './vocabulary-plan.ts';
 import { HttpError, type ReadingStore } from './store.ts';
 
@@ -40,6 +41,6 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
 export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: 10 | 30,now=Date.now()): StoryPlan {
   if (!difficulties.includes(difficulty) || ![10,30].includes(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
   const ceiling = getPreferences(store).ceilings[difficulty];
-  return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:minutes*16,
+  return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:targetWordCount(store,minutes),
     ceiling,...vocabularyFor(store,ceiling,now)};
 }
