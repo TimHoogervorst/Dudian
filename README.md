@@ -1,4 +1,6 @@
-﻿# Dudian (读点)
+<h1 align="center">
+  <img src="docs/dudian-logo.png" alt="Dudian (读点)" width="300">
+</h1>
 
 I built Dudian to improve my Chinese. It’s a small app I vibe-coded between other projects to get a reading routine that works for me. I read short stories about Baobao, tap unfamiliar words for their meanings, and practice them again later.
 
