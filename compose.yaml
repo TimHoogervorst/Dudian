@@ -1,0 +1,13 @@
+services:
+  reader:
+    build: .
+    ports:
+      - "3000:3000"
+      - "127.0.0.1:14551:14551"
+    environment:
+      DATA_DIR: /data
+      SIWC_BIND: 0.0.0.0
+    volumes:
+      - reader-data:/data
+volumes:
+  reader-data: {}
