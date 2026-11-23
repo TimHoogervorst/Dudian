@@ -16,14 +16,33 @@ interface Grant {
   refresh: string;
   expires: number;
 }
-interface Installation { host: string; grant?: Grant }
+interface Installation { host: string; grant?: Grant; textModel?:string }
 
-async function checked(response: Response, action: string) {
-  if (!response.ok) throw new Error(action + ' failed (HTTP ' + response.status + '). Check your ChatGPT plan, usage limit, and connection in Settings.');
+function providerFailure(label:string,response:Response,event:any,access?:string) {
+  const error=event?.response?.error ?? event?.error ?? event?.detail ?? event;
+  const reason=event?.response?.incomplete_details?.reason;
+  const details=[error?.code ?? event?.code,typeof error==='string'?error:error?.message ?? event?.message,reason]
+    .filter((v):v is string=>typeof v==='string' && Boolean(v.trim()));
+  const requestId=response.headers.get('x-request-id') ?? event?.request_id;
+  const parts=[label,...new Set(details)];
+  if(!details.length)parts.push('No further error details were supplied.');
+  if(typeof requestId==='string')parts.push('Request ID '+requestId);
+  let message=parts.join(' · ');
+  if(access)message=message.replaceAll(access,'[redacted]');
+  return new Error(message.replace(/\bBearer\s+[^\s,;]+|\bsk-[\w-]+/gi,'[redacted]').replace(/\s+/g,' ').slice(0,1500));
+}
+
+async function checked(response: Response, action: string,access?:string) {
+  if (!response.ok) {
+    const label=action+' failed (HTTP '+response.status+').';
+    if(!access)throw new Error(label+' Check the ChatGPT connection in Settings.');
+    const payload=await response.json().catch(()=>null);
+    throw providerFailure(label,response,payload,access);
+  }
   return response;
 }
 
-async function completedText(response: Response) {
+async function completedText(response: Response,access:string) {
   // Each SSE data event is a JSON record. Only a completed response is usable.
   const records = (await response.text()).split(/\r?\n\r?\n/);
   let output = '';
@@ -34,10 +53,10 @@ async function completedText(response: Response) {
     if (event.type === 'response.output_text.delta') output += event.delta;
     if (event.type === 'response.completed' && output) return output;
     if (['response.failed', 'response.incomplete', 'error'].includes(event.type)) {
-      throw new Error('ChatGPT returned ' + event.type + '. Check plan usage in Settings and retry.');
+      throw providerFailure('ChatGPT reported '+event.type+'.',response,event,access);
     }
   }
-  throw new Error('ChatGPT ended the stream before completing the response. Retry the request.');
+  throw providerFailure('ChatGPT ended the stream without a completed text response.',response,null,access);
 }
 
 export class PlanConnection {
@@ -73,7 +92,7 @@ export class PlanConnection {
       code_challenge_method: 'S256',
       code_challenge: createHash('sha256').update(attempt.verifier).digest('base64url')
     }).toString();
-    if (!this.install.grant) url.searchParams.set('agent_name_hint', 'Street Talk');
+    if (!this.install.grant) url.searchParams.set('agent_name_hint', 'Dudian');
     return url;
   }
   async complete(url: URL) {
@@ -144,15 +163,27 @@ export class PlanConnection {
       }).finally(() => { this.refreshing = undefined; });
     return this.refreshing;
   }
-  async generateText(prompt: string, instructions = 'Return only the requested text.') {
+  get textModel(){return this.install.textModel??'';}
+  async textModels():Promise<string[]> {
     const {access} = await this.credentials();
     const headers = {Authorization:'Bearer ' + access,'Content-Type':'application/json'};
-    const models = await (await checked(await this.request(resource+'/models',{headers,signal:AbortSignal.timeout(30000)}),'Model selection')).json();
-    const model = models.models?.find((model:{visibility:string,slug:string}) => model.visibility === 'list' && model.slug)?.slug;
+    const models = await (await checked(await this.request(resource+'/models',{headers,signal:AbortSignal.timeout(30000)}),'Model selection',access)).json();
+    return (models.models??[]).filter((m:any)=>m.visibility==='list' && typeof m.slug==='string' && m.slug).map((m:any)=>m.slug);
+  }
+  async selectTextModel(model:unknown){
+    if(typeof model!=='string'||(model && !(await this.textModels()).includes(model)))throw Error('Choose an available story text model.');
+    this.save({...this.install,textModel:model});
+  }
+  async generateText(prompt: string, instructions = 'Return only the requested text.') {
+    const models=await this.textModels();
+    const model=this.textModel||models[0];
+    if(this.textModel && !models.includes(model))throw Error('The selected text model '+model+' is unavailable. Choose another in Settings.');
     if (!model) throw new Error('This ChatGPT account has no available plan models.');
+    const {access}=await this.credentials();
+    const headers={Authorization:'Bearer '+access,'Content-Type':'application/json'};
     const result = await this.request(resource+'/responses',{method:'POST',headers,signal:AbortSignal.timeout(240000),
       body:JSON.stringify({model,instructions,input:[{role:'user',content:prompt}],store:false,stream:true})});
-    return completedText(await checked(result,'Generation'));
+    return completedText(await checked(result,'Generation',access),access);
   }
 }
 

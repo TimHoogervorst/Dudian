@@ -18,6 +18,6 @@ test('browsers share resume state through the reader API', async () => {
     assert.equal(moved.status,200);
     assert.deepEqual((await read()).position,{chapter:0,paragraph:1});
     const home = await fetch(base).then(r=>r.text());
-    assert.match(home,/Street Talk/);
+    assert.match(home,/Dudian/);
   } finally { server.close(); store.db.close(); }
 });

@@ -1,4 +1,5 @@
 import {el,api,link,ui} from '../ui.js';
+import {summaryHeading} from '../summary-heading.js';
 
 async function startReview(options) {
   const session = await api('/api/flashcards/sessions',options);
@@ -9,34 +10,86 @@ export function startWordReview(words) {
 }
 function libraryAction({root,parts}) {
   if (parts[1]==='entry') return;
-  const kind = parts[0]==='word'?'word':'character';
-  const button = el('button',kind==='word'?'Practice words':'Practice characters','button lib-review');
+  const button = el('button','Practice','button lib-review');
   button.onclick = async () => {
     button.disabled=true;
-    try { await startReview({kind,level:Number(parts[1]??1)}); }
+    try { await startReview({kind:'mixed',level:Number(parts[1]??1)}); }
+    catch(error){ui.notice(error.message);}
     finally {button.disabled=false;}
   };
   root.querySelector('.lib-controls')?.append(button);
 }
 
+function drawSummary(root,session){
+  const page=el('div',null,'page-summary');
+  const groups=new Map([['Improved',[]],['Went down',[]],['Held steady',[]],['Earlier reviews',[]]]);
+  const grades={correct:'Got it',almost:'Almost',incorrect:'Incorrect'};
+  for(const item of session.results){
+    const group=item.points===null?'Earlier reviews':item.points>0?'Improved':item.points<0?'Went down':'Held steady';
+    groups.get(group).push(item);
+  }
+  const metrics=[[session.total,'Cards reviewed'],[session.results.filter(item=>item.grade==='correct').length,'Got it'],
+    [session.results.filter(item=>item.grade==='almost').length,'Almost'],[session.results.filter(item=>item.grade==='incorrect').length,'Incorrect']];
+  const titles={mixed:'Words and characters',word:'Word practice',character:'Character practice'};
+  page.append(summaryHeading('Practice complete',titles[session.kind],metrics));
+  for(const [name,items] of groups){
+    if(!items.length)continue;
+    const section=el('section',null,'summary-panel');
+    const heading=el('div',null,'summary-section-heading');
+    heading.append(el('h2',name),el('span',items.length+(items.length===1?' card':' cards')));
+    const cards=el('div',null,'summary-characters');
+    for(const item of items){
+      const card=link('','#/library/'+item.kind+'/entry/'+encodeURIComponent(item.text),'summary-character');
+      const glyph=el('strong',item.text);glyph.lang='zh-Hans';
+      card.append(glyph,el('span',item.pinyin??''));
+      if(item.points!==null){
+        const delta=(item.points>0?'+':'')+item.points;
+        card.append(el('b',delta+(Math.abs(item.points)===1?' point':' points'),item.points<0?'recall-loss':item.points===0?'recall-steady':''));
+      }
+      card.append(el('small',grades[item.grade]));cards.append(card);
+    }
+    section.append(heading);
+    if(name==='Earlier reviews')section.append(el('p','These grades were saved before point changes were recorded.'));
+    section.append(cards);page.append(section);
+  }
+  const actions=el('div',null,'summary-actions');
+  actions.append(link('Back to Library',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'button'));
+  page.append(actions);root.append(page);
+}
+
 function draw(root,session) {
   root.replaceChildren();
-  const header = el('header',null,'card-heading');
-  const deck = session.kind==='word'?'Words':'Characters';
-  header.append(link('← '+deck,'#/library/'+session.kind,'text-link'),el('h1','Flashcards'));
-  root.append(header);
   if (!session.card) {
-    const result = el('section',null,'recall-card');
-    result.append(el('h2','Review complete'),el('p',session.total+' '+(session.total===1?'card':'cards')+' reviewed.'),
-      link('Back to Library','#/library/'+session.kind,'button'));
-    root.append(result);
+    drawSummary(root,session);
     return;
   }
+  const header = el('header',null,'card-heading');
+  header.append(link('← Library',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'text-link'),el('h1','Flashcards'));
+  root.append(header);
   const card = el('section',null,'recall-card');
-  const counter = el('p',deck+' · '+(session.index+1)+' of '+session.total,'overline');
+  const counter = el('p',(session.card.kind==='character'?'Characters':'Words')+' · '+(session.index+1)+' of '+session.total,'overline');
   const text = el('h2',session.card.text,'recall-text');
+  text.lang='zh-Hans';
+  const readings=el('p',[...new Set(session.card.senses.map(s=>s.pinyin))].join(' · '),'recall-pinyin');
+  const hint=el('button','Show example','recall-example-button');
+  const glyph=el('span','文');glyph.setAttribute('aria-hidden','true');hint.prepend(glyph);
+  const example=el('p',null,'recall-example');example.lang='zh-Hans';example.id='card-example';example.hidden=true;
+  hint.setAttribute('aria-expanded','false');hint.setAttribute('aria-controls',example.id);
+  hint.onclick=async()=>{
+    hint.disabled=true;
+    try{
+      if(!example.hasChildNodes()){
+        hint.lastChild.textContent='Loading example…';
+        const {before,target,after}=await api('/api/flashcards/sessions/'+session.id+'/example',{index:session.index});
+        example.append(before,el('mark',target),after);
+      }
+      example.hidden=!example.hidden;
+      hint.setAttribute('aria-expanded',String(!example.hidden));
+    }catch(error){if(card.isConnected)ui.notice(error.message);}
+    finally{hint.lastChild.textContent=example.hidden?'Show example':'Hide example';hint.disabled=false;}
+  };
   const reveal = el('button','Reveal answer','button');
-  card.append(counter,text,reveal);
+  card.append(counter,text,readings,hint,example,reveal);
   root.append(card);
   let busy=false;
   const grade = async value => {
@@ -46,7 +99,10 @@ function draw(root,session) {
       const zone=Intl.DateTimeFormat().resolvedOptions().timeZone;
       const next = await api('/api/flashcards/sessions/'+session.id+'/grade',{index:session.index,grade:value,zone});
       draw(root,next);
-      root.querySelector('button,a.button')?.focus();
+      if(next.card)root.querySelector('button')?.focus();
+      else{
+        const title=root.querySelector('h1');title.tabIndex=-1;title.focus();
+      }
     } finally {busy=false;}
   };
   reveal.onclick=()=>{

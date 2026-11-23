@@ -3,7 +3,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { join, extname, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ReadingStore, HttpError } from './store.ts';
+import {readerChapters} from './chapter-check.ts';
+import {strengthFor} from './strength.ts';
+import type {PreviewItem} from './store.ts';
 import {markAdvance} from './activity.ts';
+import {initializeGeneration} from './generation-job.ts';
 
 const root = fileURLToPath(new URL('../',import.meta.url));
 const publicDir = join(root,'public');
@@ -29,6 +33,7 @@ async function body(req: IncomingMessage) {
   catch { throw new HttpError(400,'Expected a JSON request.'); }
 }
 export async function createApp(store: ReadingStore) {
+  initializeGeneration(store);
   const features: Handler[] = [];
   for (const file of files('src/features').filter(f=>f.endsWith('.ts'))) {
     const feature = await import(pathToFileURL(join(root,'src/features',file)).href);
@@ -54,7 +59,22 @@ export async function createApp(store: ReadingStore) {
       }
       if (path==='/api/stories' && req.method==='GET') return json(200,store.stories());
       const match = path.match(/^\/api\/stories\/([^/]+)(\/position)?$/);
-      if (match && !match[2] && req.method==='GET') return json(200,{story:store.story(match[1]),position:store.position(match[1])});
+      if (match && !match[2] && req.method==='GET') {
+        const story=store.story(match[1]);
+        const preview=story.preview;
+        const focus=new Map<string,PreviewItem>();
+        if(url.searchParams.has('focus') && preview){
+          for(const item of [...preview.words??[],...preview.compound?[preview.compound]:[],...preview.characters??[],
+            ...preview.review??[],...preview.wordReview??[]]){
+            const entry=focus.get(item.text)??{text:item.text};
+            entry.pinyin||=item.pinyin;
+            entry.meaning||=item.meaning;
+            entry.example||=item.example;
+            focus.set(item.text,entry);
+          }
+        }
+        return json(200,{...(url.searchParams.has('focus')?{focus:[...focus.values()].map(item=>({...item,color:strengthFor(store.db,'word',item.text).color}))}:{}),story:{...story,chapters:readerChapters(store,story)},position:store.position(match[1])});
+      }
       if (match && match[2] && req.method==='POST') {
         const {chapter,paragraph}=await ctx.body();
         const previous=store.position(match[1]);
@@ -84,5 +104,5 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href===import.met
   mkdirSync(dir,{recursive:true});
   const app = await createApp(new ReadingStore(join(dir,'reading.sqlite')));
   const port = Number(process.env.PORT ?? 3000);
-  app.listen(port,process.env.HOST ?? '0.0.0.0',()=>console.log('Street Talk is listening on port '+port));
+  app.listen(port,process.env.HOST ?? '0.0.0.0',()=>console.log('Dudian is listening on port '+port));
 }

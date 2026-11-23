@@ -1,6 +1,7 @@
 import {HttpError,type ReadingStore} from './store.ts';
 import {completionFor} from './completion.ts';
-import {ensureActions,sentenceText} from './word-actions.ts';
+import {actionParagraph,ensureActions,sentenceText} from './word-actions.ts';
+import {catalog} from './catalog.ts';
 
 function completed(store:ReadingStore,id:string) {
   const story=store.story(id);
@@ -24,12 +25,35 @@ export function storySummary(store:ReadingStore,id:string) {
   for(const record of records) {
     const word=String(record.word);
     if(!groups.has(word))groups.set(word,new Set());
-    const paragraph=story.chapters[Number(record.chapter)].paragraphs[Number(record.paragraph)];
+    const paragraph=actionParagraph(story,Number(record.chapter),Number(record.paragraph))!;
     groups.get(word)!.add(sentenceText(paragraph,Number(record.token)));
   }
   const words=new Set(story.chapters.flatMap(chapter=>chapter.paragraphs.flat())
-    .filter(token=>/\p{Script=Han}/u.test(token.text)).map(token=>token.text));
+    .filter(token=>!token.cast && /\p{Script=Han}/u.test(token.text)).map(token=>token.text));
   const row=store.db.prepare('SELECT rating FROM story_ratings WHERE story_id=?').get(id);
+  const attempts=store.db.prepare('SELECT chapter,question,choice FROM quiz_attempts WHERE story_id=? AND choice IS NOT NULL').all(id);
+  const reviews=attempts.filter(a=>story.chapters[Number(a.chapter)].questions?.[Number(a.question)].reviewRound);
+  const comprehension=attempts.filter(a=>!story.chapters[Number(a.chapter)].questions?.[Number(a.question)].reviewRound);
+  const reviewCorrect=reviews.filter(a=>story.chapters[Number(a.chapter)].questions![Number(a.question)].correct===a.choice).length;
+  const correct=comprehension.filter(a=>story.chapters[Number(a.chapter)].questions?.[Number(a.question)].correct===a.choice).length;
+  const preview=story.preview;
+  const targets=new Set((preview?.characters??[]).map(item=>item.text));
+  const focusWords=[...(preview?.words??[]),...(preview?.review??[])].map(item=>item.text);
+  if(preview?.compound)focusWords.push(preview.compound.text);
+  for(const chapter of story.chapters)for(const q of chapter.questions??[]){
+    for(const char of q.characters)targets.add(char);
+    focusWords.push(q.word);
+  }
+  const related=new Set(focusWords.join(''));
+  const priority=(char:string)=>targets.has(char)?2:related.has(char)?1:0;
+  const gains=store.db.prepare('SELECT character,points FROM story_character_points WHERE story_id=? AND points>0 ORDER BY points DESC,character')
+    .all(id).map(row=>({text:String(row.character),points:Number(row.points)}))
+    .sort((a,b)=>priority(b.text)-priority(a.text));
+  const characters=gains.map(item=>({...item,focus:priority(item.text)>0,
+    pinyin:catalog.get('character',item.text)?.senses[0]?.pinyin}));
   return {title:story.title,chapters:story.chapters.length,distinctWords:words.size,rating:row?.rating??null,
+    characterGains:{highlights:characters.slice(0,5),others:characters.slice(5),otherCount:Math.max(0,characters.length-5)},
+    ...(comprehension.length?{quiz:{correct,total:comprehension.length}}:{}),
+    ...(reviews.length?{wordReview:{correct:reviewCorrect,total:reviews.length}}:{}),
     marked:[...groups].map(([text,sentences])=>({text,sentences:[...sentences]}))};
 }

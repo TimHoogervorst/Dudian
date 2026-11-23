@@ -7,7 +7,9 @@ services:
     environment:
       DATA_DIR: /data
       SIWC_BIND: 0.0.0.0
+      DUDIAN_COVER_JOBS: /cover-jobs
     volumes:
       - reader-data:/data
+      - ./.work/cover-jobs:/cover-jobs
 volumes:
   reader-data: {}

@@ -7,3 +7,12 @@
 .recall-grades button:last-child{background:var(--red);color:var(--paper)}
 .recall-hint{font:.8rem var(--sans);color:var(--muted)}.lib-review{font-size:.94rem}
 @media(pointer:fine){.recall-hint{display:none}}
+.summary-character b.recall-loss{color:var(--red)}
+.summary-character b.recall-steady{color:var(--muted)}
+.page-cards .summary-character{min-width:0;overflow-wrap:anywhere}
+.recall-card .recall-text{margin-bottom:.1em}
+.recall-pinyin{margin:.2rem 0 .8rem;font:1.2rem var(--sans);color:var(--muted)}
+.recall-example-button{display:flex;align-items:center;gap:.45rem;margin:0 auto 1.2rem;padding:.4rem .75rem;font-size:.9rem}
+.recall-example-button span{font-family:"Songti SC","SimSun",serif}
+.recall-example{font-size:1.4rem;line-height:1.6;margin:0 0 1.2rem}
+.recall-example mark{background:#f5d68e;color:var(--ink);border-radius:.2em}

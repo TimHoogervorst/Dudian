@@ -5,6 +5,9 @@ import {ensureActions,recordAction,usageHistory} from '../word-actions.ts';
 export default async function readerActions({req,url,store,json,body}:Context) {
   if (url.pathname==='/api/word-action' && req.method==='POST') {
     json(200,recordAction(store,await body()));
+  } else if(url.pathname==='/api/cover-marks' && req.method==='GET'){
+    ensureActions(store.db);
+    json(200,store.db.prepare("SELECT DISTINCT token FROM word_actions WHERE story_id=? AND chapter=-1 AND kind='difficulty'").all(url.searchParams.get('story')).map(r=>Number(r.token)));
   } else if (url.pathname==='/api/reader-preferences' && ['GET','POST'].includes(req.method??'')) {
     ensureActions(store.db);
     if(req.method==='POST') {

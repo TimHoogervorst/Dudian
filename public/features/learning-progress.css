@@ -1,0 +1,23 @@
+﻿.learning-progress{margin-top:2rem}
+.learning-header,.points-heading{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+.learning-header h2{font-size:clamp(1.75rem,3vw,2.5rem);margin:.4rem 0}
+.learning-period{display:flex;border:1px solid var(--line);border-radius:2rem;padding:.18rem}
+.learning-period button{border:0;border-radius:2rem;background:transparent;padding:.45rem .8rem;font:600 .9rem var(--sans)}
+.learning-period [aria-pressed=true]{background:var(--red);color:var(--paper)}
+.progress-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem;margin:.65rem 0}
+.progress-cards section,.points-chart{border:1px solid var(--line);border-radius:.9rem;background:#fff8ed;padding:1rem 1.2rem}
+.progress-cards h3,.points-heading h3{margin:0;font-size:1.2rem}
+.progress-cards strong{display:block;color:var(--red);font-size:2rem;margin:.25rem 0}
+.progress-cards span,.points-heading span,.tracking-note,.points-graph{font:.88rem var(--sans);color:var(--muted)}
+.strong-examples{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.4rem}.strong-examples a{padding:.2rem .5rem;border-radius:.4rem;background:#e7ecdd;color:#385735}
+.points-graph{display:grid;grid-template-columns:3rem minmax(0,1fr);grid-template-rows:9rem 1.25rem;margin-top:.65rem;font-size:.75rem}
+.points-plot,.points-axis,.points-dates{position:relative}
+.points-axis span{position:absolute;right:.6rem;transform:translateY(-50%)}
+.points-dates{grid-column:2}.points-dates span{position:absolute;transform:translateX(-50%)}
+.points-plot svg{width:100%;height:100%}.points-plot line,.points-plot polyline{vector-effect:non-scaling-stroke;fill:none}
+.points-plot line{stroke:var(--line)}.points-plot polyline{stroke:var(--red);stroke-width:2}
+.points-hit{position:absolute;top:0;bottom:0;padding:0;border:0;border-radius:0;background:transparent}
+.points-hit::after{content:'';position:absolute;left:50%;top:var(--dot);transform:translate(-50%,-50%);width:6px;height:6px;border-radius:50%;background:var(--red)}
+.points-hit:is(:hover,:focus-visible)::after{box-shadow:0 0 0 3px #851e2140}
+.tracking-note{margin:.5rem .15rem}
+@media(max-width:430px){.progress-cards{gap:.45rem}.progress-cards section,.points-chart{padding:.75rem}.points-graph{grid-template-columns:2rem minmax(0,1fr)}}

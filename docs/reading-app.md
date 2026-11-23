@@ -7,7 +7,7 @@ An open-source TypeScript web app runs locally in Docker with one seeded admin l
 ### The reading loop
 
 1. Start on a dashboard showing reading activity and progress. Put Practice, Library, and Settings in the bottom navigation on mobile and at the top on desktop.
-2. Choose Practice → Reading and request a short or long story. Aim for about 10 or 30 minutes of practice, including rereading and lookups. Divide long stories into resumable chapters. Begin with a provisional length estimate and adapt it from completed, timed chapters.
+2. Choose Practice → Reading. Short, medium, and long stories contain one, two, and five chapters respectively. Each easy chapter has one paragraph, medium has two, and hard has three or four. Aim for about 40 segmented words per paragraph.
 3. Choose Easy, Medium, or Hard when generating a story. Tailor the story to introduce new characters or revisit material the learner struggles with or has had little practice reading. A story at any difficulty may focus entirely on review. Preview the new characters with their meanings and pronunciations before reading.
 4. Validate the entire story before showing its introduction. Check the promised targets and vocabulary budget, then save its chapters and word annotations together so resumed sessions show the same text.
    Show simplified Chinese with small pinyin controlled by a persistent Settings preference. A single tap on a word reveals its English meaning in the sentence. A double-tap explicitly marks difficulty with that word.
@@ -41,7 +41,7 @@ Start every new learner at HSK 1 in the six-level curriculum. All entries begin 
 
 Assign each character to the earliest curriculum level containing a word that uses it. Show examples from the learner’s level first. In a word entry, display each character’s pronunciation in that word and link to its other readings and uses.
 
-A difficulty mark immediately lowers the selected word’s reading strength. The occurrence appears in its characters’ usage histories while their strength scores stay intact. A single-tap lookup carries no difficulty penalty or review timer and excludes that word from the chapter’s unaided-reading gain. On chapter completion, award a small gain once per distinct word read unaided. Opening a chapter awards no credit. An explicit flashcard judgment carries more weight than an unaided chapter encounter.
+A difficulty mark immediately lowers the selected word’s reading strength. The occurrence appears in its characters’ usage histories while their strength scores stay intact. A single-tap lookup carries no difficulty penalty or review timer and excludes that word from the chapter’s unaided-reading gain. On chapter completion, award a small gain once per distinct word read unaided. Opening a chapter awards no credit. For new stories, unaided encounters with teaching and review targets earn 1 point on Easy, 2 on Medium, and 3 on Hard. Other eligible vocabulary earns 1 point.
 
 Group material under HSK levels 1–6. Use green for strong reading knowledge, yellow for uncertain, red for struggling, and gray for unseen. Mix strong items with weaker items in flashcard practice. Reveal pronunciation and meaning on request. Support self-assessment as correct, almost, or incorrect, with right, down, or left swipes respectively.
 
@@ -51,7 +51,7 @@ Green requires repeated success. A first correct flashcard answer leaves an unse
 
 Start separate Characters or Words sessions of up to ten cards. Favor weaker items and mix in familiar ones. Offer Incorrect, Almost, and Got it buttons on desktop and mobile, with mobile swipe shortcuts. Almost covers partial recall of pronunciation or meaning.
 
-An explicit Finish chapter action awards the chapter’s automatic reading gains once per learner. Rereading, refreshing, or finishing the same chapter on another device cannot award those gains again. Learners can still mark a difficult word on a later reading.
+Answering the final chapter question (or selecting Finish chapter on a story without questions) awards the chapter’s automatic reading gains once per learner. Rereading, refreshing, or finishing the same chapter on another device cannot award those gains again. Learners can still mark a difficult word on a later reading.
 
 ### Presentation
 
@@ -67,12 +67,44 @@ At story completion, show each explicitly marked word alongside the sentence whe
 
 The supplied illustrations establish the warm paper palette, deep red controls, and responsive chapter layout. The desktop reference places the chapter list beside the reading column and opens a dictionary alongside it. Generate the text first. Artwork and audio in the references are outside the current reading discussion.
 
+### 包包 and illustrated story covers
+
+Dudian (读点) is the app name. 包包 (Bāobāo) drives the action in every newly generated story. Beginner stories use a small, concrete goal with a visible outcome, like catching a train with Dad. More advanced stories can revisit the same setting with richer language and more complicated situations.
+
+Start with 包包 and everyday family life. Mom and Dad can appear in early scenes. The intended progression introduces more relatives, such as a younger sister and an uncle, as the learner gains distinct Strong characters. Introduced cast members stay available. Other food characters are a future expansion. Add Meet the cast to the Library, beginning with 包包’s portrait, name, pinyin, and a short introduction.
+
+Allow approved cast names in stories as names. Selecting 包包 shows the character’s name and introduction. Name occurrences consume no teaching slot and award no vocabulary strength. Ordinary vocabulary uses of the same written characters follow the usual learning rules.
+
+Each new story has one cover illustration based on a scene from its accepted text and the approved 包包 reference portrait. Use the illustration for the story thumbnail and cover page. The cover includes a one- or two-sentence Chinese teaser in the approved vocabulary, the chapter list, and Start reading. Continue reading resumes the saved paragraph. Make the text available as soon as it and the comprehension checks are ready. Display the reference portrait while illustration is pending or unavailable, and allow artwork retries for the same story.
+
 ### UI reference screenshots
 
 - [Mobile dashboard, story list, reader, and word card](<Street Talk Mandarin reading app screens.png>)
 - [Mobile chapter reader](<A Rainy Afternoon Story.png>)
 - [Desktop chapter reader with chapter list and dictionary](<Rainy Afternoon Tea Shop Reader-1.png>)
 - [Desktop reading dashboard](<Street Talk reading week dashboard-2.png>)
+
+### First release of the cast and cover
+
+包包 is the only named cast member with a profile. Every new story names 包包 in the reading text. 妈妈 and 爸爸 are ordinary family vocabulary. Apply the cast-name rule to the cover teaser and comprehension questions too. A question about whom 包包 accompanied can test 爸爸.
+
+Extend the existing story introduction into the cover. Keep its New this story and Practice again vocabulary sections with pronunciation and meanings. Show the cover illustration, short Chinese teaser, Start reading, and chapter list on this page.
+
+Dudian uses the Sign in with ChatGPT open-source preview for story text. As verified on 23 November 2026, its plan-funded inference route excludes image generation even when the selected model accepts image input. [OpenAI preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
+
+Offer both artwork paths in the first release. By default, show the approved 包包 portrait and offer **Copy illustration prompt** and **Import cover**. The learner can use the story’s scene description and reference portrait in ChatGPT Images, then import the illustration for that story. Use the imported image on the cover and in the story overview.
+
+Automatic artwork uses a host Codex worker signed in with ChatGPT. New installations enable subscription covers by default. Existing learners keep their automatic-generation preference. Separately billed API artwork requires explicitly choosing the API provider. The cover, vocabulary preview, and reader are available while the illustration is being drawn.
+
+## Chapter comprehension checks
+
+Generate and save comprehension questions in the background story-generation job after the chapter text passes validation. Each question links to a supporting sentence in its chapter and identifies the tested word and its contextual sense. The backend validates these references and checks the Chinese in the prompt and all choices against the story’s approved vocabulary pool. A question may use familiar words that do not occur in the chapter. Stories saved before this feature retain their original completion flow.
+
+New chapters end with one inline comprehension question on Easy, two on Medium, and three on Hard. Hover over the Chinese words for dictionary help or tap a prompt word. Each question has three choices and one correct answer. **Show English** reveals the prompt and choices. Submitting the final answer marks the chapter complete and offers the next chapter or story summary. Previously saved chapters keep their original checks.
+
+Save the first answer and its reading-strength updates together. Immediately show the correct choice and supporting sentence. Leaving and returning resumes the check with submitted answers locked. Record chapter completion after all its questions have answers, at any score. The saved check works without contacting the AI service.
+
+Apply +1, +2, or +3 according to the saved story difficulty for an unaided correct answer and −1 for an incorrect answer to the tested word and to each explicitly tested teaching or review character. A correct answer after revealing English counts toward the quiz score and earns zero strength points. Exclude tested items from the ordinary chapter-completion strength bonus. For a question testing 椅子 with 椅 as a teaching target, update the word 椅子 and the character 椅.
 
 ## Local data and persistence
 

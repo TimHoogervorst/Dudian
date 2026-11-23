@@ -1,8 +1,12 @@
+import {planWordReviews,wordReviewCards} from './word-review.ts';
 import { randomUUID } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { type ReadingStore, type Story, type Token } from './store.ts';
-import { type StoryPlan } from './story-plan.ts';
+import { paragraphCounts, type StoryPlan } from './story-plan.ts';
 import { generateText } from './provider.ts';
+import {generateQuestions} from './quiz-generation.ts';
+import {isTranslation} from './paragraph-translation.ts';
+import {numberSentences} from './cover-text.ts';
 
 export type CandidateWriter = (prompt:string) => Promise<string>;
 type Chapter = Story['chapters'][number];
@@ -32,10 +36,15 @@ function promptFor(plan:StoryPlan,dictionary:Lexicon) {
     word+' '+senses.map((s,i) => String(i+1)+'='+s.meaning).join(' | ')).join('\n');
   return [
     'Write one coherent, engaging slice-of-life story for a learner of simplified Mandarin. Titles are short and in English.',
-    'Return only a JSON object with title and chapters. Each chapter has title and paragraphs. Each paragraph is an array of sentences. Each sentence is an ordered array of strings.',
+    'The protagonist is always 包包 (Bāobāo), a little cream-colored steamed bun with a green satchel. Use 包包:1 as the cast name. Family members like 妈妈 and 爸爸 use ordinary glossary entries. No other named characters.',
+    ...(plan.subject?['Center the plot on the selected subject '+plan.subject.en+' ('+plan.subject.zh+'). Express it using the approved glossary and weave the focus words into the action.']:[]),
+    'At beginner level write a picture-book adventure with a concrete goal and visible outcome. As vocabulary grows, allow richer situations and motivations.',
+    'This learner has strong reading knowledge of '+(plan.strongCharacters??0)+' distinct Chinese characters.',
+    'Include a teaser property: one or two short spoiler-free Chinese sentences, encoded as a flat array of the same FORM:NUMBER and punctuation tokens.',
+    'Return only a JSON object with title, teaser and chapters. Each chapter has title, paragraphs and translations. translations is an array of natural English strings, exactly one full translation per paragraph in matching order. Preserve dialogue, names and meaning without adding explanations. Each paragraph is an array of sentences. Each sentence is an ordered array of strings.',
     'Each word token must be exactly FORM:NUMBER, using the glossary number for its contextual meaning. Send punctuation as separate strings. Example sentence ["我:1","喝:1","茶:1","。"].',
-    'Use only listed forms, including for names, numbers, and particles. Segment at natural word boundaries.',
-    'Write '+plan.chapterCount+' chapter(s) totaling approximately '+plan.targetWords+' word occurrences. Use multiple paragraphs for each chapter.',
+    'Use only listed forms and the cast name 包包:1. Segment at natural word boundaries.',
+    'Write '+plan.chapterCount+' chapter(s) totaling approximately '+plan.targetWords+' word occurrences. Every chapter must have '+paragraphCounts[plan.difficulty].join(' to ')+' paragraphs. Aim for 40 segmented words per paragraph.',
     'Use each teaching word at least once: '+[...plan.newWords,...(plan.compound?[plan.compound]:[])].join('、'),
     'Reuse each review word in at least two distinct sentences: '+plan.reviewWords.join('、'),
     'Allowed glossary with per-word sense numbers:',glossary
@@ -46,6 +55,7 @@ function title(value: unknown) {
   return typeof value === 'string' && value.trim().length > 0 && value.length <= 180;
 }
 function tokenFor(raw:unknown,dictionary:Lexicon,sentence:number,chapter:number): Token {
+  if(raw==='包包:1')return {text:'包包',pinyin:'Bāobāo',meaning:'Our steamed-bun friend',cast:'baobao',sentence};
   if (typeof raw === 'string' && /^[，。！？、；：“”‘’（）…—《》,.!?:;]+$/u.test(raw)) return {text:raw,sentence};
   const match = typeof raw === 'string' ? /^([^:\s]+):([1-9]\d*)$/u.exec(raw) : null;
   const sense = match && dictionary.get(match[1])?.[Number(match[2])-1];
@@ -56,22 +66,40 @@ function list(input:unknown): input is unknown[] { return Array.isArray(input) &
 function chapterFrom(raw:any,index:number,dictionary:Lexicon): Chapter {
   const fail = () => new CandidateError('Chapter '+(index+1)+' needs a title and nonempty paragraphs of segmented sentences.',index);
   if (!raw || !title(raw.title) || !list(raw.paragraphs)) throw fail();
+  const invalid=new Set<string>();
   const paragraphs: Token[][] = raw.paragraphs.map((para:unknown) => {
     if (!list(para)) throw fail();
     return para.flatMap((sentence,i) => {
       if (!list(sentence)) throw fail();
-      const tokens = sentence.map(value => tokenFor(value,dictionary,i,index));
-      if (!tokens.some(token => token.entry)) throw fail();
+      const tokens:Token[]=[];
+      for(const value of sentence){
+        try{tokens.push(tokenFor(value,dictionary,i,index));}
+        catch(error){
+          if(!(error instanceof CandidateError))throw error;
+          invalid.add(String(value).slice(0,60));
+        }
+      }
+      if (!invalid.size && !tokens.some(token => token.entry)) throw fail();
       return tokens;
     });
   });
-  return {title:raw.title.trim(),paragraphs};
+  if(invalid.size)throw new CandidateError('Chapter '+(index+1)+' contains an unlisted form or sense: '+[...invalid].slice(0,15).join(', '),index);
+  if(!Array.isArray(raw.translations) || raw.translations.length!==paragraphs.length || !raw.translations.every(isTranslation))
+    throw new CandidateError('Provide one complete English translation per paragraph in the translations array, in matching order.',index);
+  return {title:raw.title.trim(),paragraphs,translations:raw.translations.map((text:string)=>text.trim())};
 }
 function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   if (!candidate || !title(candidate.title) || !Array.isArray(candidate.chapters) || candidate.chapters.length !== plan.chapterCount) {
     throw new CandidateError('Expected a title and exactly '+plan.chapterCount+' chapters.');
   }
   const chapters:Chapter[] = candidate.chapters.map((raw:unknown,i:number) => chapterFrom(raw,i,dictionary));
+  const [min,max]=paragraphCounts[plan.difficulty];
+  for(const [i,chapter] of chapters.entries()){
+    if(chapter.paragraphs.length<min || chapter.paragraphs.length>max)
+      throw new CandidateError('Each '+plan.difficulty+' chapter requires '+min+' to '+max+' paragraphs.',i);
+    if(chapter.paragraphs.some(tokens=>tokens.filter(t=>t.entry||t.cast).length>60))
+      throw new CandidateError('Shorten each paragraph to at most 60 words.',i);
+  }
   const sentencesByWord = new Map<string,Set<string>>();
   let count = 0;
   chapters.forEach((chapter,c) => chapter.paragraphs.forEach((tokens,p) => tokens.forEach(token => {
@@ -100,7 +128,20 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
     const revisedSize=Math.max(1,size+plan.targetWords-count);
     throw new CandidateError('The story contains '+count+' words; aim for approximately '+revisedSize+' words in the revised chapter.',sizes.indexOf(size));
   }
-  return {title:candidate.title.trim() as string,chapters};
+  const scene=chapters.flatMap(c=>c.paragraphs).find(tokens=>tokens.some(t=>t.cast));
+  if(!scene)throw new CandidateError('Name 包包:1 as the protagonist in the chapter text.',0);
+  let teaser:string;
+  let tokens:Token[];
+  try{
+    if(!Array.isArray(candidate.teaser)||candidate.teaser.length>90)throw Error();
+    tokens=numberSentences(candidate.teaser.map((t:unknown)=>tokenFor(t,dictionary,0,0)));
+    teaser=tokens.map(t=>t.text).join('');
+    if(!/^(?:[^。！？]+[。！？]){1,2}$/u.test(teaser))throw Error();
+  }catch{throw new CandidateError('Supply a teaser of one or two complete sentences using approved FORM:NUMBER tokens and punctuation.');}
+  const prompt='Illustrate one scene from “'+candidate.title.trim()+'” as a warm children’s picture-book cover. '+
+    'Match 包包 in the supplied reference: cream pleated bun, rosy cheeks, tiny limbs and green crossbody satchel. '+
+    'Show the action and setting of this passage. Keep the character recognizable. No lettering.\n'+scene.map(t=>t.text).join('');
+  return {title:candidate.title.trim() as string,chapters,cover:{teaser,prompt,tokens}};
 }
 
 function previewFor(plan:StoryPlan,chapters:Chapter[]) {
@@ -118,16 +159,23 @@ function previewFor(plan:StoryPlan,chapters:Chapter[]) {
     const sense = char?.senses.find(sense=>sense.pinyin===reading) ?? char?.senses[0];
     return {text,example,pinyin:reading ?? sense?.pinyin,meaning:text===example ? occurrence.meaning : sense?.meaning};
   });
-  return {characters,compound:plan.compound?wordPreview(plan.compound):undefined,review:plan.reviewWords.map(wordPreview)};
+  return {characters,reviewCharacters:plan.reviewCharacters,words:plan.newWords.map(wordPreview),compound:plan.compound?wordPreview(plan.compound):undefined,review:plan.reviewWords.map(wordPreview)};
 }
-export async function generateStory(store:ReadingStore,plan:StoryPlan,write:CandidateWriter=generateText) {
+export type GenerationStage = 'planning'|'writing'|'checking'|'revising'|'questions'|'saving';
+export async function generateStory(store:ReadingStore,plan:StoryPlan,write:CandidateWriter=generateText,
+  report:(stage:GenerationStage,detail?:string)=>void=()=>{}) {
   const dictionary = lexicon(plan);
-  const instructions = promptFor(plan,dictionary);
+  const rounds=planWordReviews(store,plan);
+  const instructions=[promptFor(plan,dictionary),...rounds.map(({chapter,words})=>
+    'Use each of these word-review targets as a segmented word by the end of chapter '+(chapter+1)+': '+words.join(', ')+'.')].join('\n');
   let prompt = instructions;
   let candidate;
   let chapter: number | undefined;
-  for (let attempt = 0; ; attempt++) {
+  const repairs=new Map<number|string,number>();
+  report('writing');
+  for (;;) {
     const raw = await write(prompt);
+    report('checking');
     try {
       let revision;
       try { revision = JSON.parse(raw); }
@@ -135,18 +183,41 @@ export async function generateStory(store:ReadingStore,plan:StoryPlan,write:Cand
       if (chapter === undefined) candidate = revision;
       else candidate.chapters[chapter] = revision;
       const accepted = validate(candidate,plan,dictionary);
-      const story = {id:randomUUID(),...accepted,preview:previewFor(plan,accepted.chapters)};
+      for(const {chapter,words} of rounds){
+        const seen=new Set(accepted.chapters.slice(0,chapter+1).flatMap(c=>c.paragraphs.flat()).map(t=>t.entry));
+        const missing=words.filter(word=>!seen.has(word));
+        if(missing.length)throw new CandidateError('Include these word-review targets in the chapter: '+missing.join(', '),chapter);
+      }
+      const tokens=accepted.chapters.flatMap(c=>c.paragraphs.flat());
+      const wordReview=[...new Set(rounds.flatMap(r=>r.words))].map(text=>{
+        const {pinyin,meaning}=tokens.find(t=>t.entry===text)!;
+        return {text,pinyin,meaning};
+      });
+      const story={id:randomUUID(),difficulty:plan.difficulty,...accepted,
+        preview:{...previewFor(plan,accepted.chapters),wordReview}};
+      report('questions');
+      for(const section of story.chapters){
+        section.questions=await generateQuestions(section,plan,[...dictionary.keys(),'包包'],write);
+      }
+      rounds.forEach(({chapter,words},i)=>story.chapters[chapter].questions!.push(...wordReviewCards(story.chapters,chapter,words,i+1)));
+      report('saving');
       store.saveStory(story);
       return story;
     } catch (error) {
       if (!(error instanceof CandidateError)) throw error;
-      if (attempt === 2) throw new CandidateError(error.message+' Two corrections were unsuccessful. Try again.');
       chapter = error.chapter;
+      const scopeKey=chapter??'story';
+      const used=repairs.get(scopeKey)??0;
+      const limit=3;
+      const subject=chapter===undefined?'story draft':'chapter '+(chapter+1);
+      if(used>=limit)throw new CandidateError(error.message+' Reached the limit of '+limit+' automatic retries for '+subject+'. Try again.');
+      repairs.set(scopeKey,used+1);
+      report('revising','Correcting '+subject+' · attempt '+(used+1)+' of '+limit);
       const feedback = 'Validation feedback: '+error.message;
       if (chapter === undefined) {
         prompt = [instructions,feedback,'Supply a corrected complete story.'].join('\n');
       } else {
-        const scope = 'Revise only chapter '+(chapter+1)+'. Return only its JSON object with title and paragraphs. All other chapters will remain as written.';
+        const scope = 'Revise only chapter '+(chapter+1)+'. Return only its JSON object with title, paragraphs and matching English translations. Keep valid sentences. Check EVERY token against the glossary. Rewrite any sentence containing an unlisted form using approved vocabulary, and use only a listed sense number. All other chapters will remain as written.';
         prompt = [instructions,feedback,scope,'Current draft:',JSON.stringify(candidate)].join('\n');
       }
     }

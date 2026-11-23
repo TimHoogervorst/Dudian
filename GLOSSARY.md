@@ -10,6 +10,14 @@ A single written Chinese symbol, such as 东. Its Library entry links to words t
 **Word**  
 A vocabulary entry made up of one or more characters, such as 东西. A word can be looked up in a story and practiced as a whole flashcard.
 
+**Cast member**
+
+A recurring figure in Dudian’s story world. The steamed-bun protagonist is a cast member from the learner’s first story.
+
+**包包 (Bāobāo)**
+
+Dudian’s recurring steamed-bun protagonist, recognizable by a cream-colored pleated top, rosy cheeks, tiny limbs, and a green crossbody satchel.
+
 **Reading strength**  
 An estimate of how reliably the learner recognizes and understands an item while reading.
 
@@ -27,6 +35,10 @@ The learner’s explicit judgment that they struggled with a particular word in 
 
 **Story rating**  
 The learner’s thumbs-up or thumbs-down judgment of a story.
+
+**Comprehension check**
+
+A short set of multiple-choice questions the learner answers at the end of a chapter. Each question tests the meaning of specific vocabulary through something that happened in that chapter.
 
 **Flashcard review**  
 A practice attempt in which the learner recalls the pronunciation and meaning of the displayed Chinese, reveals the answer, and assesses their recall.

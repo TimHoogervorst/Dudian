@@ -7,6 +7,7 @@ import { finishChapter } from '../src/completion.ts';
 import { catalog } from '../src/catalog.ts';
 import { startSession, gradeCard } from '../src/flashcards.ts';
 import { generateStory } from '../src/story-generation.ts';
+import {withChapterQuestions} from './quiz-fixture.ts';
 
 const day = 86_400_000;
 test('a learner with only strong words reviews the least recently practiced eligible word',t=>{
@@ -37,9 +38,9 @@ test('marked words remain available as background, then become deliberate review
   assert.deepEqual([...due.reviewWords].sort(),['我','茶','朋友'].sort());
   assert.equal(due.newCharacters.length,0);
   const sentence=due.reviewWords.map(word=>word+':1');
-  const story=await generateStory(store,{...due,chapterCount:1,targetWords:6},async()=>JSON.stringify({
-    title:'Reunion',chapters:[{title:'Tea',paragraphs:[[[...sentence,'。'],[...sentence.reverse(),'。']]]}],
-  }));
+  const story=await generateStory(store,{...due,chapterCount:1,targetWords:30},withChapterQuestions(async prompt=>JSON.stringify({
+    title:'Reunion',chapters:[{title:'Tea',paragraphs:[[[...sentence,...[...prompt.matchAll(/segmented word by the end of chapter 1: (.+)\./g)].flatMap(m=>m[1].split(', ').map(w=>w+':1')),'。']],[[...sentence,'。']],[[...sentence,'。']]]}],
+  }),3));
   assert.deepEqual(story.preview.review.map(w=>w.text),due.reviewWords);
 });
 

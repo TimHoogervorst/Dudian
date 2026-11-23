@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {ReadingStore} from '../src/store.ts';
 import {finishChapter} from '../src/completion.ts';
 import {recordInterval} from '../src/activity.ts';
-import {buildPlan} from '../src/story-plan.ts';
+import {targetWordCount} from '../src/pace.ts';
 
-test('story length adapts after three measured chapters while vocabulary difficulty stays fixed',()=>{
+test('historical pace estimate uses completed, timed chapters',()=>{
   function history(seconds:number) {
     const store=new ReadingStore();
     for(let i=0;i<3;i++) {
@@ -16,15 +16,14 @@ test('story length adapts after three measured chapters while vocabulary difficu
       // A gap before pressing Finish chapter is idle. Rereading afterward is outside the sample.
       finishChapter(store,story.id,0,start+3600000);
       recordInterval(store,story.id,0,30000,start+3700000);
-      if(i===1)assert.equal(buildPlan(store,'easy',10).targetWords,160);
+      if(i===1)assert.equal(targetWordCount(store,10),160);
     }
     return store;
   }
   const faster=history(60),slower=history(120);
   try {
-    assert.equal(buildPlan(faster,'easy',10).targetWords,240);
-    assert.equal(buildPlan(slower,'easy',10).targetWords,120);
-    assert.equal(buildPlan(slower,'easy',30).targetWords,360);
-    assert.equal(buildPlan(slower,'easy',30).ceiling,buildPlan(slower,'easy',10).ceiling);
+    assert.equal(targetWordCount(faster,10),240);
+    assert.equal(targetWordCount(slower,10),120);
+    assert.equal(targetWordCount(slower,30),360);
   } finally {faster.db.close();slower.db.close();}
 });

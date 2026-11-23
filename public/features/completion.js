@@ -1,14 +1,22 @@
 import {el,link,api} from '../ui.js';
 
+import {mountCheck} from './check.js';
+import {markCompleted} from '../reader-layout.js';
+
 export function setup(ui) {
   ui.on('reader',async context=>{
     const {story,position,controls}=context;
     const base='/api/stories/'+encodeURIComponent(story.id);
+    if(story.chapters[position.chapter].hasCheck){
+      await mountCheck(ui,context);
+      return;
+    }
     const state=await api(base+'/completion',undefined,context.signal);
     if(context.signal.aborted)return;
     const finish=el('button','Finish chapter','button');
     const footer=el('div',null,'finish-actions');controls.append(footer);
     function show(result) {
+      markCompleted(context.root,result.chapters);
       footer.replaceChildren();
       if(!result.chapters.includes(position.chapter)) {footer.append(finish);return;}
       footer.append(el('span','✓ Chapter finished','completion-state'));
@@ -25,6 +33,7 @@ export function setup(ui) {
       try{
         await context.flushWordActions?.();
         await context.flushActiveTime?.();
+        if(context.signal.aborted)return;
         const result=await api(base+'/complete',{chapter:position.chapter});
         if(context.signal.aborted)return;
         show(result);

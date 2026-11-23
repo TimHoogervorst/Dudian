@@ -1,7 +1,7 @@
 import type {DatabaseSync} from 'node:sqlite';
 import {catalog} from './catalog.ts';
-import {ReadingStore,HttpError,type Token} from './store.ts';
-import {adjustStrength} from './strength.ts';
+import {ReadingStore,HttpError,type Token,type Story} from './store.ts';
+import {adjustStoryStrength,strengthFor} from './strength.ts';
 
 // Authored senses for the bundled chapter, including copies already saved by earlier versions.
 const teaSenses: Record<string,string> = {
@@ -27,6 +27,10 @@ export function ensureActions(db: DatabaseSync) {
 }
 
 export interface WordAction {storyId:string;chapter:number;paragraph:number;token:number;id:string;kind:'lookup'|'difficulty'}
+// Covers are outside the numbered chapters and have a single summary paragraph.
+export function actionParagraph(story:Story,chapter:number,paragraph:number){
+  return chapter===-1 && paragraph===0?story.cover?.tokens:story.chapters[chapter]?.paragraphs[paragraph];
+}
 export function sentenceText(tokens:Token[],index:number) {
   const sentence=tokens[index].sentence;
   return tokens.filter(t=>t.sentence===sentence).map(t=>t.text).join('');
@@ -38,9 +42,10 @@ export function recordAction(store:ReadingStore, action:WordAction, now=Date.now
     throw new HttpError(400,'Select a word in this chapter.');
   }
   const story=store.story(action.storyId);
-  const occurrence=story.chapters[action.chapter]?.paragraphs[action.paragraph]?.[action.token];
+  const occurrence=actionParagraph(story,action.chapter,action.paragraph)?.[action.token];
   if (!occurrence || !/\p{Script=Han}/u.test(occurrence.text)) throw new HttpError(400,'Select a Chinese word.');
   const {text}=occurrence;
+  if(occurrence.cast)return {text,cast:occurrence.cast,pinyin:occurrence.pinyin,meaning:occurrence.meaning,sense:undefined};
   const sense=occurrence.sense ?? (story.id==='tea-shop' ? teaSenses[text] : undefined);
   const item=catalog.get('word',occurrence.entry??text);
   const selected=item?.senses.find(candidate=>candidate.id===sense);
@@ -50,10 +55,10 @@ export function recordAction(store:ReadingStore, action:WordAction, now=Date.now
   try {
     const result=db.prepare('INSERT OR IGNORE INTO word_actions VALUES(?,?,?,?,?,?,?,?)')
       .run(action.id,story.id,action.chapter,action.paragraph,action.token,text,action.kind,now);
-    if (result.changes && action.kind==='difficulty') adjustStrength(db,'word',text,-3);
+    if (result.changes && action.kind==='difficulty') adjustStoryStrength(db,story.id,text,-3,now);
     db.exec('COMMIT');
   } catch(error) {db.exec('ROLLBACK');throw error;}
-  return {text,sense:selected.id,pinyin:selected.pinyin,meaning:selected.meaning};
+  return {text,...(action.kind==='difficulty'?{color:strengthFor(db,'word',text).color}:{}),sense:selected.id,pinyin:selected.pinyin,meaning:selected.meaning};
 }
 
 export function usageHistory(store:ReadingStore,char:string) {
@@ -61,7 +66,7 @@ export function usageHistory(store:ReadingStore,char:string) {
   return store.db.prepare(`SELECT * FROM word_actions WHERE kind='difficulty' AND instr(word,?)>0
     ORDER BY at DESC`).all(char).map(row=>{
     const story=store.story(String(row.story_id));
-    const tokens=story.chapters[Number(row.chapter)].paragraphs[Number(row.paragraph)];
+    const tokens=actionParagraph(story,Number(row.chapter),Number(row.paragraph))!;
     return {word:String(row.word),at:Number(row.at),storyId:story.id,title:story.title,chapter:Number(row.chapter),sentence:sentenceText(tokens,Number(row.token))};
   });
 }

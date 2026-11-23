@@ -1,13 +1,19 @@
-import { targetWordCount } from './pace.ts';
 import { vocabularyFor } from './vocabulary-plan.ts';
 import { HttpError, type ReadingStore } from './store.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
 export type Difficulty = typeof difficulties[number];
+export const chapterCounts = {10:1,20:2,30:5} as const;
+export type StoryLength = keyof typeof chapterCounts;
+export const paragraphCounts = {easy:[1,1],medium:[2,2],hard:[3,4]} as const;
+export function validLength(value:unknown): value is StoryLength {
+  return typeof value==='number' && Object.hasOwn(chapterCounts,value);
+}
 export interface Preferences {difficulty:Difficulty; ceilings:Record<Difficulty,number>}
 export interface StoryPlan {
+  subject?:import('./practice-subjects.ts').Subject;
   difficulty: Difficulty;
-  minutes: 10 | 30;
+  minutes: StoryLength;
   chapterCount: number;
   targetWords: number;
   ceiling: number;
@@ -15,6 +21,8 @@ export interface StoryPlan {
   newWords: string[];
   newCharacters: string[];
   reviewWords: string[];
+  reviewCharacters?: string[];
+  strongCharacters?: number;
   compound?: string;
 }
 
@@ -38,9 +46,11 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
   return preferences;
 }
 
-export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: 10 | 30,now=Date.now()): StoryPlan {
-  if (!difficulties.includes(difficulty) || ![10,30].includes(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
+export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: StoryLength,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
+  if (!difficulties.includes(difficulty) || !validLength(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
   const ceiling = getPreferences(store).ceilings[difficulty];
-  return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:targetWordCount(store,minutes),
-    ceiling,...vocabularyFor(store,ceiling,now)};
+  const chapterCount=chapterCounts[minutes];
+  const [min,max]=paragraphCounts[difficulty];
+  return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40,
+    ceiling,...vocabularyFor(store,ceiling,now,excluded)};
 }

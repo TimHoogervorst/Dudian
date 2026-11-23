@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 
 export type ItemKind = 'word' | 'character';
+export function entryKind(kind:ItemKind,text:string):ItemKind {
+  return Array.from(text).length===1?'character':kind;
+}
 export interface CatalogItem { text: string; level: number }
 const data = (name: string) => readFileSync(new URL('../data/' + name, import.meta.url));
 const curriculum: string[][] = JSON.parse(data('hsk.json').toString('utf8'));
@@ -14,11 +17,12 @@ for (const word of words) {
   for (const char of new Set(word.text)) {
     if (!levels.has(char)) levels.set(char, word.level);
     if (!examples.has(char)) examples.set(char, []);
-    examples.get(char)!.push(word);
+    if(char!==word.text)examples.get(char)!.push(word);
   }
 }
 const characters = Array.from(levels, ([text, level]) => ({text, level}));
 const wordLevels = new Map(words.map(word => [word.text, word.level]));
+const compoundWords=words.filter(item=>entryKind('word',item.text)==='word');
 
 export interface Sense { id: string; pinyin: string; meaning: string; syllables: string[] }
 const linesByWord = new Map<string, string[]>();
@@ -71,6 +75,11 @@ function dictionarySenses(text: string): Sense[] {
 }
 
 export const catalog = {
+  wordLevel(text:string){return wordLevels.get(text);},
+  isCurriculumWord(text:string){return wordLevels.has(text);},
+  libraryItems(kind:ItemKind,level:number){
+    return (kind==='word'?compoundWords:characters).filter(item=>item.level===level);
+  },
   get(kind: ItemKind, text: string, senseId?: string) {
     if (kind === 'character' && Array.from(text).length !== 1) return;
     const senses = dictionarySenses(text);

@@ -1,8 +1,17 @@
 import { DatabaseSync } from 'node:sqlite';
 import { seedStory } from './seed.ts';
+import {recoverCoverTokens} from './cover-text.ts';
+import type {Difficulty} from './story-plan.ts';
 
-export interface Token { text: string; pinyin?: string; meaning?: string; entry?: string; sense?: string | number; sentence?: number }
-export interface Story { id: string; title: string; chapters: { title: string; paragraphs: Token[][] }[] }
+export interface Token { text: string; pinyin?: string; meaning?: string; entry?: string; sense?: string | number; sentence?: number; cast?:'baobao' }
+export interface QuizText { zh:string; words?:string[]; en:string }
+export interface ChapterQuestion {
+  reviewRound?:number; sourceChapter?:number;
+  prompt:QuizText; choices:QuizText[]; correct:number; paragraph:number; token:number;
+  word:string; sense:string|number; characters:string[];
+}
+export interface PreviewItem {text:string;pinyin?:string;meaning?:string;example?:string}
+export interface Story { id: string; title: string; difficulty?:Difficulty; preview?:{wordReview?:PreviewItem[];characters:PreviewItem[];reviewCharacters?:string[]; words?:PreviewItem[];review:PreviewItem[];compound?:PreviewItem}; cover?:{teaser:string;prompt:string;tokens?:Token[]}; chapters: { title: string; paragraphs: Token[][]; translations?:(string|null)[]; questions?:ChapterQuestion[] }[] }
 export interface Position { chapter: number; paragraph: number }
 export class HttpError extends Error {
   status: number;
@@ -19,9 +28,29 @@ export class ReadingStore {
       CREATE TABLE IF NOT EXISTS learners(id INTEGER PRIMARY KEY, role TEXT NOT NULL);
       INSERT OR IGNORE INTO learners VALUES(1,'admin');
       CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS story_completions(story_id TEXT PRIMARY KEY REFERENCES stories(id),at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS story_character_points(story_id TEXT NOT NULL REFERENCES stories(id),character TEXT NOT NULL,points INTEGER NOT NULL,PRIMARY KEY(story_id,character));
+      CREATE TABLE IF NOT EXISTS hidden_stories(story_id TEXT PRIMARY KEY REFERENCES stories(id));
+      CREATE TABLE IF NOT EXISTS score_tracking(id INTEGER PRIMARY KEY CHECK(id=1),started_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS score_changes(
+        kind TEXT NOT NULL,text TEXT NOT NULL,before_score INTEGER NOT NULL,after_score INTEGER NOT NULL,
+        at INTEGER NOT NULL,manual INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS score_changes_time ON score_changes(at);
       CREATE TABLE IF NOT EXISTS positions(story_id TEXT PRIMARY KEY REFERENCES stories(id), chapter INTEGER NOT NULL, paragraph INTEGER NOT NULL, updated_at INTEGER NOT NULL);
     `);
+    this.db.prepare('INSERT OR IGNORE INTO score_tracking VALUES(1,?)').run(Date.now());
     if (!this.db.prepare('SELECT 1 FROM stories WHERE id=?').get(seedStory.id)) this.saveStory(seedStory);
+    // Preserve the character status when both legacy entries were rated independently.
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const exists=this.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?");
+      if(exists.get('reading_strength'))this.db.exec(`
+        INSERT OR IGNORE INTO reading_strength(kind,text,score)
+          SELECT 'character',text,score FROM reading_strength WHERE kind='word' AND length(text)=1;
+        DELETE FROM reading_strength WHERE kind='word' AND length(text)=1;`);
+      if(exists.get('flashcard_reviews'))this.db.exec("UPDATE flashcard_reviews SET kind='character' WHERE kind='word' AND length(text)=1");
+      this.db.exec('COMMIT');
+    }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
   saveStory(story: Story) {
     this.db.prepare('INSERT INTO stories VALUES(?,?,?,?)').run(story.id,story.title,JSON.stringify(story),Date.now());
@@ -30,10 +59,15 @@ export class ReadingStore {
   story(id: string): Story {
     const row = this.db.prepare('SELECT content FROM stories WHERE id=?').get(id);
     if (!row) throw new HttpError(404, 'Story not found.');
-    return JSON.parse(String(row.content));
+    const story:Story=JSON.parse(String(row.content));
+    if(story.cover && !story.cover.tokens){
+      story.cover.tokens=recoverCoverTokens(story);
+      this.db.prepare('UPDATE stories SET content=? WHERE id=?').run(JSON.stringify(story),id);
+    }
+    return story;
   }
   stories() {
-    return this.db.prepare('SELECT id,title,created_at FROM stories ORDER BY created_at DESC,id').all();
+    return this.db.prepare('SELECT id,title,created_at FROM stories WHERE id NOT IN (SELECT story_id FROM hidden_stories) ORDER BY created_at DESC,id').all();
   }
   position(id: string): Position {
     const row = this.db.prepare('SELECT chapter,paragraph FROM positions WHERE story_id=?').get(id);

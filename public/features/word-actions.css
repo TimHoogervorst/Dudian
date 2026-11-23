@@ -1,10 +1,20 @@
 .chapter-text [data-word]{cursor:pointer;border-radius:.12em}
 .chapter-text [data-word]:hover{background:#eddfc7}
 .chapter-text .selected-word{background:#eed087}
-.chapter-text ruby rt{font:500 .35em/1.2 var(--sans);letter-spacing:0;color:var(--muted)}
-.dictionary-word{font:2.5rem/1.3 "Songti SC","SimSun",serif;color:var(--red)}
-.dictionary .dictionary-reading{margin:.25em 0;color:var(--ink)}
-.word-detail{display:block;margin-top:1.1em;font-size:.9rem;text-decoration:underline}
+:is(.chapter-text,.check-chinese) ruby rt{font:500 .35em/1.2 var(--sans);letter-spacing:0;color:var(--muted)}
+.dictionary{position:relative;text-align:center;border-color:#c9a681;background:linear-gradient(150deg,#fffaf1,#f9efdf)}
+.dictionary h2{display:flex;align-items:center;justify-content:center;gap:.4em;padding-bottom:.55em;margin:0;border-bottom:1px solid #c9a681}
+.dictionary-entry{padding-top:1rem}
+.dictionary-word{display:block;font:clamp(3rem,4.4vw,4.75rem)/1.15 "Songti SC","SimSun",serif;color:var(--ink)}
+.dictionary .dictionary-reading{margin:.3em 0;color:var(--muted);font:500 1.3rem/1.3 var(--sans)}
+.dictionary .dictionary-meaning{margin:.4em 0 1em;font:650 1.45rem/1.3 var(--sans);color:var(--ink)}
+.dictionary-actions{display:flex;justify-content:center;gap:10px}
+.dictionary-actions :is(a,button){display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #bd9875;border-radius:10px;color:var(--red);background:transparent;font-size:1.3rem}
+.dictionary-actions a.text-link{width:auto;height:auto;min-height:44px;padding:.45rem 1rem;white-space:nowrap}
+.dictionary-actions :is(a,button):hover{background:#f1e1ca}
+.dictionary-actions button:disabled{opacity:1;background:var(--red);color:var(--paper)}
 .dictionary-close{display:none}.reader-pref label{font:1rem var(--sans)}
 .usage-history{margin-top:2rem}.usage-history h2{font-size:1.6rem}.usage-history a{font-size:.9rem}
 @media(max-width:640px){.dictionary:not(.has-word){display:none}.dictionary.has-word{position:fixed;bottom:68px;left:10px;right:10px;z-index:6;max-height:40vh;overflow:auto;box-shadow:0 6px 35px #42231832}.dictionary.has-word h2{margin-top:0}.dictionary-close{display:block;float:right;font-size:.85rem}.chapter-text{padding-bottom:1rem}}
+@media(max-width:640px){.dictionary-close{position:absolute;right:.5rem;top:.5rem;float:none;font:1.3rem/1 var(--sans);padding:8px}.dictionary.has-word{max-height:50dvh}}
+@media(min-width:641px){.reader-grid .dictionary{position:sticky;top:1rem;max-height:calc(100vh - 2rem);overflow:auto}}

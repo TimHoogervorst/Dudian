@@ -1,59 +1,134 @@
-import {api,el,link} from '../ui.js';
+import {api,el,link,ui} from '../ui.js';
+import {icon} from '../icons.js';
 
 const labels = {gray:'Unseen',red:'Struggling',yellow:'Learning',green:'Strong'};
 const labelFor = kind => kind === 'word' ? 'Words' : 'Characters';
-const browse = (kind,level,page=1) => '#/library/' + kind + '/' + level + '/' + page;
+const sizes = [20,50,100,200];
+const libraryUrl = (kind,level,page=1,size=localStorage.getItem('libraryPageSize')||50,q='',filter='') =>
+  '#/library/' + [kind,level,page,size].join('/') + (q ? '/'+encodeURIComponent(q) : '') + (filter?'/status/'+filter:'');
 const detail = (kind,text,sense) => '#/library/' + kind + '/entry/' + encodeURIComponent(text) + (sense ? '/' + encodeURIComponent(sense) : '');
 
-function status(color) {
-  const mark = el('span',labels[color],'lib-status lib-'+color);
-  return mark;
-}
-
-async function renderList(root, kind, level, page) {
-  const result = await api('/api/library?' + new URLSearchParams({kind,level,page}));
+async function renderList(root, kind, level, page, size, query, filter,signal) {
+  const browse=(kind,level,page,size,term)=>libraryUrl(kind,level,page,size,term,filter);
   const controls = el('div',null,'lib-controls');
   const tabs = el('nav',null,'lib-tabs');
   tabs.setAttribute('aria-label','Library collection');
   for (const type of ['character','word']) {
-    const tab = link(labelFor(type),browse(type,level));
+    const tab = link(labelFor(type),browse(type,level,1,size,query));
+    const symbol=el('span',type==='word'?'词':'字','lib-tab-symbol');
+    symbol.lang='zh-Hans';
+    tab.prepend(symbol);
+    tab.dataset.kind=type;
     if (type === kind) tab.setAttribute('aria-current','page');
     tabs.append(tab);
   }
-  const label = el('label','Curriculum level ');
   const select = el('select');
+  select.setAttribute('aria-label','HSK level');
   for (let n=1;n<=6;n++) {
     const option = el('option','HSK '+n);
     option.value=n;
     option.selected=n===level;
     select.append(option);
   }
-  select.onchange = () => {location.hash=browse(kind,select.value);};
-  label.append(select);
-  controls.append(tabs,label);
+  select.onchange = () => {location.hash=browse(kind,select.value,1,size,search.value.trim());};
+  const filters=el('div',null,'lib-filters');
+  const searchBox=el('label',null,'lib-search-box');
+  const search=el('input',null,'lib-search');
+  search.type='search';
+  search.placeholder='Search Chinese, pinyin, or English';
+  search.setAttribute('aria-label','Search by Chinese, pinyin, or English meaning');
+  search.value=query;
+  searchBox.append(icon('search'),search);
+  filters.append(select,searchBox);
+  controls.append(tabs,filters);
   const summary = el('div',null,'lib-summary');
-  summary.append(el('p',result.total+' '+labelFor(kind).toLowerCase()+' · HSK '+level));
+  const count=el('p');
+  count.setAttribute('role','status');
+  summary.append(count);
   const legend = el('div',null,'lib-legend');
-  Object.keys(labels).forEach(color => legend.append(status(color)));
+  legend.setAttribute('role','group');legend.setAttribute('aria-label','Filter by reading status');
+  for(const [color,label] of Object.entries(labels)){
+    const button=el('button',label,'lib-status lib-'+color);
+    button.setAttribute('aria-pressed',String(filter===color));
+    button.onclick=()=>{location.hash=libraryUrl(kind,level,1,size,search.value.trim(),filter===color?'':color);};
+    legend.append(button);
+  }
   summary.append(legend);
   const grid = el('div',null,'lib-grid');
-  for (const item of result.items) {
+  function tileFor(item) {
     const tile = link('',detail(kind,item.text),'lib-tile lib-'+item.color);
     tile.title = item.meaning;
     tile.setAttribute('aria-label',item.text+' · '+item.pinyin+' · '+labels[item.color]);
     tile.append(el('strong',item.text),el('span',item.pinyin));
-    grid.append(tile);
+    return tile;
   }
   const pages = el('nav',null,'lib-pages');
   pages.setAttribute('aria-label','Library pages');
-  if (page>1) pages.append(link('← Previous',browse(kind,level,page-1)));
-  pages.append(el('span','Page '+page+' of '+result.pages));
-  if (page<result.pages) pages.append(link('Next →',browse(kind,level,page+1)));
+  const sizeLabel=el('label','Per page ');
+  const sizeSelect=el('select');
+  for (const n of sizes) sizeSelect.append(new Option(String(n),String(n),false,n===size));
+  sizeSelect.onchange=()=>{
+    localStorage.setItem('libraryPageSize',sizeSelect.value);
+    location.hash=browse(kind,level,1,sizeSelect.value,search.value.trim());
+  };
+  sizeLabel.append(sizeSelect);
+  let version=0;
+  async function refresh(pageNumber,term) {
+    const request=++version;
+    const result=await api('/api/library?'+new URLSearchParams({kind,level,page:pageNumber,pageSize:size,q:term,status:filter}),undefined,signal);
+    if (signal.aborted || request!==version) return;
+    count.textContent=result.total+' '+(result.total===1?kind:labelFor(kind).toLowerCase());
+    grid.replaceChildren(...result.items.map(tileFor));
+    if (!result.total) grid.append(el('p','No entries match these filters.'));
+    pages.replaceChildren();
+    if (result.page>1) pages.append(link('← Previous',browse(kind,level,result.page-1,size,term)));
+    if (result.total) pages.append(el('span','Page '+result.page+' of '+result.pages));
+    if (result.page<result.pages) pages.append(link('Next →',browse(kind,level,result.page+1,size,term)));
+    pages.append(sizeLabel);
+  }
+  let timer;
+  search.oninput=()=>{
+    clearTimeout(timer);
+    version++;
+    const term=search.value.trim();
+    history.replaceState(null,'',browse(kind,level,1,size,term));
+    for (const tab of tabs.children) tab.href=browse(tab.dataset.kind,level,1,size,term);
+    timer=setTimeout(()=>refresh(1,term).catch(error=>{if(!signal.aborted) count.textContent=error.message;}),150);
+  };
+  signal.addEventListener('abort',()=>clearTimeout(timer),{once:true});
   const sources = el('footer',null,'lib-sources');
   sources.append('Dictionary by ',link('CC-CEDICT contributors','https://cc-cedict.org/wiki/'), ' · ',
     link('CC BY-SA 4.0','https://creativecommons.org/licenses/by-sa/4.0/'),' · ',
     link('HSK vocabulary','https://github.com/drkameleon/complete-hsk-vocabulary/tree/7ac65bf1a6387d35f1ade478906172a19311c7f9'));
-  root.append(el('h1','Library'),controls,summary,grid,pages,sources);
+  root.append(controls,link('Meet the cast · 包包','#/cast','text-link'),summary,grid,pages,sources);
+  await refresh(page,query);
+}
+
+function strengthMeter(text){
+  const meter=el('div',null,'lib-strength-meter');
+  meter.setAttribute('role','meter');
+  meter.setAttribute('aria-label','Reading strength for '+text);
+  meter.setAttribute('aria-valuemin','-7');
+  meter.setAttribute('aria-valuemax','12');
+  const marker=el('span',null,'lib-strength-marker');
+  const bands={};
+  for(const color of ['gray','red','yellow','green']){
+    const band=el('span',null,'lib-strength-band lib-'+color);
+    band.title=labels[color];
+    bands[color]=band;
+    meter.append(band);
+  }
+  function update({score,color}){
+    // Each band's endpoints keep the marker visibly inside its status color.
+    const ranges={red:[-6,-1],yellow:[0,5],green:[6,12]};
+    const range=ranges[color];
+    const fraction=range?(score-range[0])/(range[1]-range[0]):0;
+    marker.style.left=(color==='gray'?'0':10+80*fraction)+'%';
+    bands[color].append(marker);
+    meter.setAttribute('aria-valuenow',String(score??-7));
+    meter.setAttribute('aria-valuetext',labels[color]);
+  }
+  return {meter,update};
 }
 
 async function renderDetail(root,kind,text,sense) {
@@ -63,8 +138,26 @@ async function renderDetail(root,kind,text,sense) {
   const current = item.senses.find(s=>s.id===sense) ?? item.senses[0];
   const entry = el('article',null,'lib-entry');
   const header = el('header');
-  header.append(el('p',labelFor(kind)+(item.level ? ' · HSK '+item.level : ''),'overline'),el('h1',text),status(item.color));
-  entry.append(header);
+  const headword = el('h1',text);
+  headword.lang='zh-Hans';
+  const badge=el('label',null,'lib-status lib-'+item.color);
+  const select=el('select');
+  const strength=strengthMeter(text);
+  strength.update(item);
+  select.setAttribute('aria-label','Reading status for '+text);
+  for(const [color,label] of Object.entries(labels)) select.append(new Option(label,color,false,color===item.color));
+  select.onchange=async()=>{
+    select.disabled=true;
+    try{
+      const result=await api('/api/library?'+query,{color:select.value});
+      item.color=result.color;badge.className='lib-status lib-'+item.color;
+      strength.update(result);
+    }catch(error){select.value=item.color;ui.notice(error.message);}
+    finally{select.disabled=false;}
+  };
+  badge.append(select);
+  header.append(el('p',labelFor(kind)+(item.level ? ' · HSK '+item.level : ''),'overline'),badge,headword);
+  entry.append(header,strength.meter);
 
   const readings = new Map();
   for (const s of item.senses) {
@@ -94,17 +187,38 @@ async function renderDetail(root,kind,text,sense) {
   }
   if (item.examples.length) {
     entry.append(el('h2','Words using '+text));
-    const list = el('div',null,'lib-examples');
-    for (const word of item.examples) list.append(link(word.text+' · HSK '+word.level,detail('word',word.text)));
+    const list = el('ul',null,'lib-examples');
+    for (const word of item.examples) {
+      const row = el('li');
+      const target = link('',detail('word',word.text,word.sense));
+      const form = el('strong',word.text);
+      form.lang='zh-Hans';
+      const words = el('span',null,'example-copy');
+      words.append(form,el('span',word.meaning,'example-meaning'));
+      const arrow = el('span','→');
+      arrow.setAttribute('aria-hidden','true');
+      target.append(words,el('small','HSK '+word.level),arrow);
+      row.append(target);
+      list.append(row);
+    }
     entry.append(list);
   }
-  root.append(link('← '+labelFor(kind),browse(kind,item.level??1),'text-link'),entry);
+  root.append(link('← '+labelFor(kind),libraryUrl(kind,item.level??1),'text-link'),entry);
 }
 
 export function setup(ui) {
-  ui.route('library', async ({root,parts})=>{
+  ui.route('library', async ({root,parts,signal})=>{
     const kind=parts[0]==='word'?'word':'character';
-    if (parts[1]==='entry') return renderDetail(root,kind,parts[2],parts[3]);
-    await renderList(root,kind,Number(parts[1]??1),Number(parts[2]??1));
+    if (parts[1]==='entry'){
+      if(kind==='word' && Array.from(parts[2]??'').length===1){
+        location.replace(detail('character',parts[2],parts[3]));
+        return;
+      }
+      return renderDetail(root,kind,parts[2],parts[3]);
+    }
+    const size=Number(parts[3]??localStorage.getItem('libraryPageSize')??50);
+    const hasFilter=parts.length>=6 && parts.at(-2)==='status' && Object.hasOwn(labels,parts.at(-1));
+    const term=(hasFilter?parts.slice(0,-2):parts)[4]??'';
+    await renderList(root,kind,Number(parts[1]??1),Number(parts[2]??1),sizes.includes(size)?size:50,term,hasFilter?parts.at(-1):'',signal);
   });
 }

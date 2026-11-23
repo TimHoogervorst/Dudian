@@ -1,0 +1,20 @@
+.story-illustration { display:block; width:100%; object-fit:cover; max-height:22rem; }
+.cover-scene { width:min(100%,38rem); height:clamp(12rem,30vw,21rem); object-fit:contain; background:#f4ead9; border-radius:1rem; }
+.cover-teaser { font-size:1.45rem; line-height:1.65; }
+.cast-portrait { width:min(16rem,100%); border-radius:1rem; }
+.cover-tools { margin-block:1.2rem .5rem; }
+.cover-tools summary { cursor:pointer; }
+.cover-tools button,.cover-tools a { margin:.5rem .65rem .25rem 0; }
+.cover-tools textarea { width:100%; min-height:6rem; }
+.story-settings [hidden] { display:none; }
+.page-introduction .cover-scene { display:block; width:auto; max-width:100%; height:auto; max-height:clamp(15rem,36vh,23rem); margin:1rem auto; background:transparent; }
+main:has(.page-introduction .reader-grid) { padding-top:clamp(14px,1.4vw,22px); }
+.cover-reading-actions { text-align:center; border-block:1px solid var(--line); padding:.75rem; }
+.cover-reading-actions .cover-tools { margin:.6rem 0 0; font-size:.9rem; }
+.page-introduction .reader-center { min-width:0; }
+.page-introduction .reader-center > h2 { font-size:1.5rem; margin:1.25rem 0 .4rem; }
+.chapter-text .marked-word { text-decoration:underline dotted var(--red); text-underline-offset:.18em; }
+@media(min-width:861px){.page-introduction .dictionary { position:sticky; top:1rem; }}
+.shelf-item img.shelf-art { width:6rem; height:5rem; }
+.generation-progress:has(.ready-thumbnail) { display:flow-root; }
+.ready-thumbnail { float:inline-end; width:5rem; height:5rem; border-radius:.6rem; margin-inline-start:1rem; }

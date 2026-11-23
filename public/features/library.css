@@ -1,26 +1,61 @@
-.lib-controls,.lib-summary,.lib-pages,.lib-legend,.lib-pieces,.lib-examples {display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.lib-controls,.lib-summary {justify-content:space-between}
+main:has(.lib-controls){padding:clamp(14px,2vw,26px) clamp(16px,2.8vw,44px) 5rem}
+.lib-summary,.lib-pages,.lib-legend,.lib-pieces {display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.lib-summary {justify-content:space-between}
+.lib-controls {display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:clamp(12px,2vw,28px)}
 .lib-controls label,.lib-summary,.lib-pages,.lib-sources,.lib-status {font: .88rem/1.5 var(--sans)}
-.lib-controls select {margin-left:.5em}
+.lib-controls select,.lib-search {height:2.5rem;border:1px solid var(--line);border-radius:7px;background:#fffbf2}
+.lib-controls select {padding:.35rem .65rem;font:600 .9rem var(--sans)}
+.lib-filters {display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:clamp(10px,1.5vw,20px)}
+.lib-search-box {position:relative}
+.lib-search-box .ui-icon {position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.lib-search {min-width:0;width:100%;padding:.45rem .6rem .45rem 2.4rem;color:var(--ink);font:.94rem var(--sans)}
+.lib-controls .lib-review {border-radius:10px;padding:.55rem 1.2rem}
+.lib-grid>p {grid-column:1/-1;text-align:center;color:var(--muted)}
 .lib-tabs {display:flex;border:1px solid var(--line);border-radius:2rem;padding:3px}
-.lib-tabs a {padding:.48rem 1.2rem;border-radius:2rem}
-.lib-tabs a[aria-current] {background:var(--red);color:var(--paper)}
-.lib-summary {border-block:1px solid var(--line);margin:1.5rem 0 1rem;color:var(--muted);padding:.4rem 0}
+.lib-tabs a {display:flex;align-items:center;gap:.35rem;padding:.3rem .8rem;border-radius:2rem;font:.9rem var(--sans);white-space:nowrap}
+.lib-tab-symbol {font:1.05rem "Songti SC","SimSun",serif}
+.lib-tabs a[aria-current] {background:#f4dcd6;color:var(--red-deep);font-weight:650}
+.lib-summary {border-block:1px solid var(--line);margin:1rem 0;color:var(--muted);padding:.5rem 0}
+.lib-summary p {margin:0}
 .lib-gray {--strength:#887e72}.lib-green {--strength:#437553}.lib-yellow {--strength:#a4781e}.lib-red {--strength:#a63c39}
 .lib-status {display:inline-flex;align-items:center;gap:6px}
+.lib-legend {gap:.25rem}
+.lib-legend button {border:1px solid transparent;background:transparent;color:var(--muted);border-radius:2rem;padding:.25rem .55rem}
+.lib-legend button:hover,.lib-legend button[aria-pressed=true] {background:#f5e9d7;color:var(--ink);border-color:var(--line)}
+.lib-entry .lib-status select {border:0;background:transparent;border-radius:1rem;padding:.3rem .15rem;color:var(--ink);font:inherit;cursor:pointer}
 .lib-status:before,.lib-tile:after {content:'';width:.59rem;height:.59rem;border-radius:100%;background:var(--strength)}
-.lib-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
+.lib-grid {display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
 .lib-tile,.lib-pieces a {display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:#fffbf2}
-.lib-tile {position:relative;min-height:88px;padding:12px 6px;color:var(--ink)}
+.lib-tile {position:relative;min-height:62px;padding:7px 9px;color:var(--ink);border-radius:7px;text-align:center;overflow-wrap:anywhere}
+.lib-grid .lib-tile strong {font-size:1.45rem;line-height:1.3}
 .lib-tile:hover,.lib-pieces a:hover {background:#f5e6d1;text-decoration:none}
-.lib-tile:after {position:absolute;right:8px;top:8px}
+.lib-tile:after {position:absolute;right:6px;top:5px;width:7px;height:7px}
 .lib-tile strong,.lib-pieces strong {font:1.65rem/1.45 "Songti SC","SimSun",serif}
 .lib-tile span,.lib-pieces span {font:.86rem/1.4 var(--sans);color:var(--muted)}
 .lib-pages {justify-content:center;min-height:3.5rem}.lib-sources {color:var(--muted);margin-top:1rem}
 .lib-entry {max-width:760px;margin:1rem auto;padding:clamp(18px,4vw,44px);border:1px solid var(--line);border-radius:20px;background:#fff8eb}
-.lib-entry header {border-bottom:1px solid var(--line);padding-bottom:1.2rem}
-.lib-entry h1 {font-family:"Songti SC","SimSun",serif;letter-spacing:.04em;margin:.3rem 0}
-.lib-entry h2 {font-size:1.55rem;margin-top:1.25rem}.lib-reading ul {padding-left:1.4rem;line-height:1.55}
-.lib-pieces a,.lib-examples a {padding:8px 14px}
-.lib-examples {gap:6px}.lib-examples a {background:#f3e8d7;border-radius:7px}
-@media(max-width:640px){.lib-controls,.lib-summary{align-items:flex-start}.lib-legend{gap:8px}.lib-grid{grid-template-columns:repeat(auto-fill,minmax(85px,1fr))}.lib-controls{gap:.7rem}.lib-summary{padding:.6rem 0}.lib-summary p{margin:0}}
+.lib-entry {text-align:center;overflow-wrap:anywhere}
+.lib-entry header {display:grid;grid-template-columns:1fr auto;align-items:center;gap:.75rem;padding-bottom:1.2rem}
+.lib-strength-meter {display:grid;grid-template-columns:5fr 20fr 55fr 20fr;gap:2px;margin-inline:6px}
+.lib-strength-band {height:6px;background:var(--strength);position:relative}
+.lib-strength-band.lib-yellow {background:#dbad47}
+.lib-strength-band:first-child {border-radius:1rem 0 0 1rem}
+.lib-strength-band:last-child {border-radius:0 1rem 1rem 0}
+.lib-strength-marker {position:absolute;top:50%;transform:translate(-50%,-50%);width:13px;height:13px;border:2px solid #fff8eb;border-radius:50%;background:var(--strength);box-shadow:0 0 0 1.5px var(--ink)}
+.lib-entry header .overline {margin:0;text-align:left}
+.lib-entry header .lib-status {padding:.15rem .65rem;border:1px solid var(--line);border-radius:2rem}
+.lib-entry h1 {grid-column:1/-1;font:clamp(3.6rem,8vw,5.5rem)/1.2 "Songti SC","SimSun",serif;color:var(--ink);margin:.25rem 0}
+.lib-entry h2 {font-size:1.55rem;margin:1.4rem 0 .5rem}
+.lib-reading ul {list-style-position:inside;padding:0;max-width:32rem;margin:0 auto;line-height:1.65}
+.lib-reading li::marker {color:#ab7b54;font-size:.75em}
+.lib-pieces {justify-content:center}.lib-pieces a {padding:8px 14px}
+.lib-examples {max-width:32rem;list-style:none;margin:.75rem auto 0;padding:0;text-align:left}
+.lib-examples li {border-top:1px solid var(--line)}
+.lib-examples a {display:flex;align-items:center;gap:.8rem;padding:.8rem .6rem;border-radius:.35rem}
+.lib-examples a:hover {background:#f5e6d1;text-decoration:none}
+.example-copy {display:grid;gap:.18rem;flex:1;min-width:0}
+.example-copy strong {font:1.45rem/1.35 "Songti SC","SimSun",serif}
+.example-meaning,.lib-examples small {font:.9rem/1.4 var(--sans);color:var(--muted)}
+.lib-examples small {white-space:nowrap}
+@media(max-width:800px){.lib-grid{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}.lib-controls{grid-template-columns:1fr auto;gap:.6rem}.lib-tabs{justify-self:start}.lib-filters{grid-column:1/-1;grid-row:2}.lib-review{grid-column:2;grid-row:1}}
+@media(max-width:480px){.lib-controls .lib-review{padding:.45rem .6rem;font-size:.85rem}.lib-tabs a{padding:.3rem .45rem}.lib-legend{gap:8px}.lib-summary{gap:5px}.lib-status{font-size:.78rem}.lib-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}

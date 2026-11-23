@@ -1,27 +1,22 @@
 import {ui,el,link,api,pageNavigation} from './ui.js';
 import {reader} from './reader.js';
+import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
 document.querySelector('.skip').onclick=event=>{event.preventDefault();root.focus();};
-for(const [name,mark] of [['Practice','◈'],['Library','▤'],['Settings','⚙']]) {
+for(const [name,mark] of [['Practice','book'],['Library','books'],['Settings','settings']]) {
   const a=link(name,'#/'+name.toLowerCase());
-  const icon=el('span',mark,'nav-icon');icon.setAttribute('aria-hidden','true');a.prepend(icon);nav.append(a);
+  a.prepend(icon(mark));nav.append(a);
 }
-function practice({root}) {
-  root.append(el('h1','Practice'));
-  const options=el('section',null,'practice-options');
-  options.append(link('Reading  →','#/reading','practice-choice'));
-  for (const label of ['Speaking','Listening']) {const button=el('button',label,'practice-choice');button.disabled=true;options.append(button);}
-  root.append(options);
-}
-const pages={practice,read:reader,settings:({root})=>root.append(el('h1','Settings'))};
+const pages={read:reader,settings:({root})=>root.append(el('h1','Settings'))};
 const navigation=pageNavigation(error=>ui.notice(error.message));
 async function render() {
   const session=navigation.next();
-  const [name='home',...parts]=location.hash.replace(/^#\/?/,'').split('/').filter(Boolean).map(decodeURIComponent);
+  const [route='home',...parts]=location.hash.replace(/^#\/?/,'').split('/').filter(Boolean).map(decodeURIComponent);
+  const name=route==='reading'?'practice':route;
   const page=el('div',null,'page page-'+(Object.hasOwn(pages,name)||ui.routes.has(name)?name:'missing'));
   root.replaceChildren(page);ui.notice('');
-  document.title=(name==='home'?'Reading desk':name.charAt(0).toUpperCase()+name.slice(1))+' · Street Talk';
+  document.title=(name==='home'?'Reading desk':name.charAt(0).toUpperCase()+name.slice(1))+' · Dudian';
   for(const a of nav.children) {
     if(a.hash==='#/'+name)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
   }

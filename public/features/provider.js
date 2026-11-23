@@ -30,5 +30,25 @@ export function setup(ui) {
       finally { button.disabled = false; }
     };
     await check();
+    const label=ui.el('label','Story text model ');
+    const select=ui.el('select');
+    const result=ui.el('p');result.setAttribute('role','status');
+    label.append(select);section.append(label,result);
+    try{
+      const {selected,models}=await ui.api('/api/provider/models');
+      for(const value of new Set(['',...models,selected])){
+        const option=ui.el('option',value||'Automatic (first available)');
+        option.value=value;select.append(option);
+      }
+      select.value=selected;
+      select.disabled=!models.length&&!selected;
+      let saved=selected;
+      select.onchange=async()=>{
+        select.disabled=true;
+        try{await ui.api('/api/provider/models',{model:select.value});saved=select.value;result.textContent='Text model saved.';}
+        catch(error){select.value=saved;result.textContent=error.message;}
+        finally{select.disabled=false;}
+      };
+    }catch(error){select.disabled=true;result.textContent=error.message;}
   });
 }

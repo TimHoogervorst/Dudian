@@ -17,7 +17,7 @@ function readingEvidence(store:ReadingStore) {
   let aided=0, encountered=0;
   for (const [index,row] of recent.entries()) {
     const paragraphs=JSON.parse(String(row.paragraphs));
-    const words=new Set<string>(paragraphs.flat().map((t:{text:string})=>t.text).filter((w:string)=>/\p{Script=Han}/u.test(w)));
+    const words=new Set<string>(paragraphs.flat().filter((t:{cast?:string})=>!t.cast).map((t:{text:string})=>t.text).filter((w:string)=>/\p{Script=Han}/u.test(w)));
     for (const word of words) {
       const last=seen.get(word);
       seen.set(word,{count:(last?.count??0)+1,at:last?.at??Number(row.at)});
@@ -32,7 +32,7 @@ function readingEvidence(store:ReadingStore) {
   return {seen,chapters:recent.length,comfortable:recent.length>=2 && aided/Math.max(1,encountered)<=0.15};
 }
 
-export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
+export function vocabularyFor(store:ReadingStore, ceiling:number, now:number, excluded:ReadonlySet<string>=new Set()) {
   const {db}=store;
   const strengths=recordedStrengths(db);
   const attempts=flashcardHistory(db);
@@ -40,8 +40,9 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
   const reading=readingEvidence(store);
   const marks=db.prepare("SELECT word,max(at) AS at FROM word_actions WHERE kind='difficulty' GROUP BY word").all();
   const lastMark=new Map(marks.map(row=>[String(row.word),Number(row.at)]));
-  const eligible=(word:string)=>!lastMark.has(word) || now-lastMark.get(word)!>=day;
-  const knownWords=new Set(strengths.filter(i=>i.kind==='word').map(i=>i.text));
+  const available=(word:string)=>!lastMark.has(word) || now-lastMark.get(word)!>=day;
+  const eligible=(word:string)=>available(word) && !excluded.has(word);
+  const knownWords=new Set(strengths.filter(i=>i.kind==='word'||catalog.isCurriculumWord(i.text)).map(i=>i.text));
   const knownCharacters=new Set(strengths.filter(i=>i.kind==='character').map(i=>i.text));
   const baseline=catalog.list('word',1);
   const background=[...new Set([...baseline.map(i=>i.text),...knownWords,...lastMark.keys()])];
@@ -57,7 +58,7 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
   }).filter(item=>item.word && eligible(item.word));
   const learning=candidates.filter(item=>item.score<6)
     .sort((a,b)=>a.score-b.score || a.count-b.count || a.at-b.at || a.text.localeCompare(b.text));
-  const fallback=candidates.filter(item=>item.kind==='word')
+  const fallback=candidates.filter(item=>knownWords.has(item.text))
     .sort((a,b)=>a.at-b.at || a.count-b.count || a.text.localeCompare(b.text))[0];
   const reviews=learning.length ? [...new Set(learning.map(i=>i.word!))] : fallback ? [fallback.word!] : [];
   const difficult=new Set(candidates.filter(i=>i.score<0).map(i=>i.word));
@@ -67,7 +68,7 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
   const common=['茶','水','家','人','书','好','看','吃','来','去'];
   const newCharacters:string[]=[], newWords:string[]=[];
   const addTarget=(text:string,word:string)=>{
-    if (!eligible(word) || knownCharacters.has(text) || newCharacters.includes(text) || knownWords.has(word) || reviewWords.includes(word)) return;
+    if (!eligible(word) || excluded.has(text) || knownCharacters.has(text) || newCharacters.includes(text) || knownWords.has(word) || reviewWords.includes(word)) return;
     newCharacters.push(text);
     if (!newWords.includes(word)) newWords.push(word);
   };
@@ -106,5 +107,7 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
   const compound=budget>0 && reading.comfortable ? nextBand.find(({text})=>
     [...text].length>1 && !allowedBackground.has(text) && eligible(text)
     && !newWords.includes(text) && [...text].every(c=>knownCharacters.has(c)))?.text : undefined;
-  return {background,newCharacters,newWords,reviewWords,compound};
+  const reviewCharacters=candidates.filter(item=>item.kind==='character' && item.word && reviewWords.includes(item.word)).map(item=>item.text);
+  const strongCharacters=strengths.filter(item=>item.kind==='character' && item.score>=6).length;
+  return {background,newCharacters,newWords,reviewWords,reviewCharacters,compound,strongCharacters};
 }

@@ -1,0 +1,26 @@
+.page-check { max-width: 48rem; margin-inline: auto; }
+.check-card {
+  margin-block: 1rem; border: 1px solid #dec7aa; border-radius: 1rem;
+  padding: clamp(1rem, 3vw, 1.75rem); background: #fff9ef;
+}
+.check-card h2 { margin-block: .4rem; }
+.check-card .check-translation { margin:.25rem 0; padding-left:0; }
+.check-chinese { font-family:"Noto Serif CJK SC","Songti SC","SimSun",serif; font-weight:400; line-height:1.8; letter-spacing:.045em; }
+.check-card h2 { font-size:clamp(25px,2.15vw,35px); }
+.check-choices .check-chinese { font-size:clamp(1.2rem,1.5vw,1.55rem); }
+.check-choices small[hidden] { display:none; }
+.check-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-top: 1rem; }
+.check-choices button { padding: .65rem; overflow-wrap: anywhere; }
+.check-choices small { display: block; margin-top: .3rem; }
+.check-choices button:disabled { opacity: 1; cursor: default; }
+.check-choices .check-correct { background: #dfeddb; color: #264a30; border-color: #729677; }
+.check-choices .check-wrong { background: #fae3de; color: #832b24; }
+.check-feedback { margin-bottom: 0; }
+@media(max-width: 36rem) { .check-choices { grid-template-columns: 1fr; } }
+.chapter-done { margin-inline-start: auto; }
+.quiz-word:hover, .quiz-word:focus-visible { background: #f3d695; border-radius: .15em; }
+.check-card.word-review-card{padding:.75rem clamp(.8rem,2vw,1.3rem) 1rem;margin-block:.65rem}
+.word-review-card .overline{margin:0}
+.word-review-card h2{text-align:center;margin:.25rem 0 .45rem;font-size:clamp(1.9rem,3vw,2.5rem);line-height:1.45}
+.word-review-card .check-choices{margin-top:.4rem}
+.word-review-card .check-choices button{min-height:3.2rem;padding:.65rem .8rem;line-height:1.35}
