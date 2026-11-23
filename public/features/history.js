@@ -48,7 +48,10 @@ export function setup(ui) {
     const {stories}=await api('/api/history');
     root.append(link('← Reading desk','#/home','text-link'),el('h1','Your stories'),listing(stories));
   });
-  ui.on('reader',async({story})=>{
-    await api('/api/stories/'+encodeURIComponent(story.id)+'/opened',{});
+  ui.on('reader-ready',async({story,signal,onLeave})=>{
+    if(signal.aborted)return;
+    const opened=api('/api/stories/'+encodeURIComponent(story.id)+'/opened',{});
+    onLeave(()=>opened);
+    await opened;
   });
 }

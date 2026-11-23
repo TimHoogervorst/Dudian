@@ -19,7 +19,8 @@ export function setup(ui) {
   });
   ui.on('reader',async context=>{
     const {story,position,article,aside}=context;
-    const {pinyin}=await api('/api/reader-preferences');
+    const {pinyin}=await api('/api/reader-preferences',undefined,context.signal);
+    if(context.signal.aborted)return;
     const chapter=position.chapter;
     let sequence=0;
     let pending;
@@ -72,10 +73,7 @@ export function setup(ui) {
       };
     }
     // A navigation can occur before the second-tap window expires.
-    const observer=new MutationObserver(()=>{
-      if(!article.isConnected){if(pending){const previous=pending.word;clearPending();action(previous,'lookup');}observer.disconnect();}
-    });
-    observer.observe(document.querySelector('main'),{childList:true});
+    context.onLeave(context.flushWordActions);
   });
   ui.on('library',async ({root,parts})=>{
     if(parts[0]!=='character'||parts[1]!=='entry'||!parts[2])return;

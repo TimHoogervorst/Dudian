@@ -60,10 +60,15 @@ export function readSession(db: DatabaseSync,id: string) {
   return {id,kind,index,total:deck.length,card:entry ? {text:entry.text,senses:entry.senses} : null};
 }
 
-export function gradeCard(db: DatabaseSync,id: string,index: number,grade: string,now=Date.now()) {
+export function gradeCard(db: DatabaseSync,id: string,index: number,grade: string,now=Date.now(),zone='UTC') {
   if (!['incorrect','almost','correct'].includes(grade) || !Number.isInteger(index) || index<0) {
     throw new HttpError(400,'Choose a recall grade for the displayed card.');
   }
+  let day:Intl.DateTimeFormat;
+  try {
+    if(typeof zone!=='string')throw new RangeError();
+    day=new Intl.DateTimeFormat('sv-SE',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'});
+  } catch { throw new HttpError(400,'Unknown time zone.'); }
   ensureSchema(db);
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -72,7 +77,7 @@ export function gradeCard(db: DatabaseSync,id: string,index: number,grade: strin
       const {kind,card:{text}} = session;
       const previous = db.prepare('SELECT MAX(graded_at) AS last FROM flashcard_reviews WHERE kind=? AND text=?').get(kind,text);
       const first = previous?.last == null;
-      const anotherDay = !first && Math.floor(now/86400000)>Math.floor(Number(previous.last)/86400000);
+      const anotherDay = !first && day.format(now)>day.format(Number(previous.last));
       const strength = strengthFor(db,kind,text);
       let delta: number;
       if (grade==='correct') delta = anotherDay ? 4 : first ? 3 : 2;

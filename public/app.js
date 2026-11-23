@@ -1,19 +1,11 @@
-import {ui,el,link,api} from './ui.js';
+import {ui,el,link,api,pageNavigation} from './ui.js';
 import {reader} from './reader.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
+document.querySelector('.skip').onclick=event=>{event.preventDefault();root.focus();};
 for(const [name,mark] of [['Practice','◈'],['Library','▤'],['Settings','⚙']]) {
   const a=link(name,'#/'+name.toLowerCase());
   const icon=el('span',mark,'nav-icon');icon.setAttribute('aria-hidden','true');a.prepend(icon);nav.append(a);
-}
-function home({root}) {
-  const title=el('header',null,'page-heading');
-  title.append(el('p','Mandarin reading practice','overline'),el('h1','Your reading week'));
-  const shelf=el('section',null,'home-hero');
-  const art=el('div',null,'tea-art');art.setAttribute('role','img');art.setAttribute('aria-label','A rainy afternoon at a neighborhood tea shop');
-  const copy=el('div',null,'hero-copy');
-  copy.append(el('p','Featured story','overline'),el('h2','At the tea shop'),link('Start reading  →','#/read/tea-shop','button'));
-  shelf.append(art,copy);root.append(title,shelf);
 }
 function practice({root}) {
   root.append(el('h1','Practice'));
@@ -22,12 +14,10 @@ function practice({root}) {
   for (const label of ['Speaking','Listening']) {const button=el('button',label,'practice-choice');button.disabled=true;options.append(button);}
   root.append(options);
 }
-const pages={home,practice,read:reader,library:({root})=>root.append(el('h1','Library')),settings:({root})=>root.append(el('h1','Settings')),reading:({root})=>{
-  root.append(el('h1','Reading'),link('Open At the tea shop  →','#/read/tea-shop','button'));
-}};
-let epoch=0;
+const pages={practice,read:reader,settings:({root})=>root.append(el('h1','Settings'))};
+const navigation=pageNavigation(error=>ui.notice(error.message));
 async function render() {
-  const current=++epoch;
+  const session=navigation.next();
   const [name='home',...parts]=location.hash.replace(/^#\/?/,'').split('/').filter(Boolean).map(decodeURIComponent);
   const page=el('div',null,'page page-'+(Object.hasOwn(pages,name)||ui.routes.has(name)?name:'missing'));
   root.replaceChildren(page);ui.notice('');
@@ -36,13 +26,14 @@ async function render() {
     if(a.hash==='#/'+name)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
   }
   try {
-    await ui.emit('leave',{});
+    await session.ready;
+    if(session.signal.aborted)return;
     const draw=ui.routes.get(name)??(Object.hasOwn(pages,name)?pages[name]:null);
     if(!draw)throw Error('Page not found.');
-    await draw({root:page,parts});
-    if(current!==epoch)return;
-    if(name!=='read')await ui.emit(name,{root:page,parts});
-  } catch(e){ if(current===epoch) {page.replaceChildren(el('h1','Unable to open page'),el('p',e.message),link('Back to reading desk','#/home','text-link'));} }
+    const context={root:page,parts,...session};
+    await draw(context);
+    if(name!=='read')await ui.emit(name,context);
+  } catch(e){ if(!session.signal.aborted) {page.replaceChildren(el('h1','Unable to open page'),el('p',e.message),link('Back to reading desk','#/home','text-link'));} }
 }
 window.addEventListener('unhandledrejection',e=>{ui.notice(e.reason?.message||'The action could not be completed.');});
 try {
