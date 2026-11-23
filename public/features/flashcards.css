@@ -1,0 +1,9 @@
+.card-heading,.recall-card{max-width:640px;margin:0 auto}
+.recall-card{border:1px solid var(--line);border-radius:20px;background:#fff8eb;padding:clamp(20px,5vw,56px);text-align:center}
+.recall-card .recall-text{font-family:"Songti SC","SimSun",serif;font-size:clamp(56px,10vw,100px);font-weight:500;letter-spacing:.02em;margin:.5em 0;touch-action:none}
+.recall-answers{max-height:38vh;overflow-y:auto;line-height:1.55;margin:0 auto 1em}
+.recall-answers p{margin:.3em 0}.recall-answers strong{color:var(--red)}
+.recall-grades{border-top:1px solid var(--line);display:flex;justify-content:center;flex-wrap:wrap;gap:.5rem;padding-top:1rem}
+.recall-grades button:last-child{background:var(--red);color:var(--paper)}
+.recall-hint{font:.8rem var(--sans);color:var(--muted)}.lib-review{font-size:.94rem}
+@media(pointer:fine){.recall-hint{display:none}}
