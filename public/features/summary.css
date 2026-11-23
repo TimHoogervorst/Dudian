@@ -1,0 +1,5 @@
+.summary-panel{max-width:48rem;border-top:1px solid var(--line);padding:.5rem 0 1.5rem}
+.summary-panel dt{font-size:1.6rem;color:var(--red);font-weight:bold;margin-top:.8rem}
+.summary-panel dd{font-size:1.2rem;line-height:1.6;margin:0}
+.rating-options{display:flex;gap:.75rem;flex-wrap:wrap}
+.rating-options button[aria-pressed=true]{background:var(--red);color:var(--paper)}
