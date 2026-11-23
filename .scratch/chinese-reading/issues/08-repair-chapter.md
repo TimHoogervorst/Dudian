@@ -4,10 +4,10 @@
 
 **Blocked by:** 07 Generate a first story within a vocabulary budget
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Implementation seam:** The validator reports chapter-specific problems; the generation service owns the story-wide correction budget.
 
-- [ ] Use a recorded candidate that introduces an unplanned word in chapter three. Request a targeted revision with the specific failure and retain unaffected chapters.
-- [ ] Revalidate the entire candidate after each correction, including whole-story budgets and targets. Publish only a complete valid story.
-- [ ] Stop after two automatic correction attempts across the story, offer a manual retry, and keep failed candidates out of history. Confirm successful and exhausted retries leave learner scores intact.
+- [x] Use a recorded candidate that introduces an unplanned word in chapter three. Request a targeted revision with the specific failure and retain unaffected chapters.
+- [x] Revalidate the entire candidate after each correction, including whole-story budgets and targets. Publish only a complete valid story.
+- [x] Stop after two automatic correction attempts across the story, offer a manual retry, and keep failed candidates out of history. Confirm successful and exhausted retries leave learner scores intact.

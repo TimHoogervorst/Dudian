@@ -7,7 +7,7 @@ An open-source TypeScript web app runs locally in Docker with one seeded admin l
 ### The reading loop
 
 1. Start on a dashboard showing reading activity and progress. Put Practice, Library, and Settings in the bottom navigation on mobile and at the top on desktop.
-2. Choose Practice → Reading and request a short or long story. Aim for about 10 or 30 minutes of practice, including rereading and lookups. Divide long stories into resumable chapters. The method for estimating duration is open.
+2. Choose Practice → Reading and request a short or long story. Aim for about 10 or 30 minutes of practice, including rereading and lookups. Divide long stories into resumable chapters. Begin with a provisional length estimate and adapt it from completed, timed chapters.
 3. Choose Easy, Medium, or Hard when generating a story. Tailor the story to introduce new characters or revisit material the learner struggles with or has had little practice reading. A story at any difficulty may focus entirely on review. Preview the new characters with their meanings and pronunciations before reading.
 4. Validate the entire story before showing its introduction. Check the promised targets and vocabulary budget, then save its chapters and word annotations together so resumed sessions show the same text.
    Show simplified Chinese with small pinyin controlled by a persistent Settings preference. A single tap on a word reveals its English meaning in the sentence. A double-tap explicitly marks difficulty with that word.

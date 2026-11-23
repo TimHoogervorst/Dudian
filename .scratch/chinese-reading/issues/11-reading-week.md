@@ -4,11 +4,11 @@
 
 **Blocked by:** 05 Finish a chapter and see reading progress
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Implementation seam:** Record learner activity and completion by day. Make active reading time available independently of the dashboard.
 
-- [ ] Leave a day empty after an immediate open and close. Lightly fill it on paragraph advancement, lookup, difficulty mark, or one active reading minute.
-- [ ] Fully fill the day when at least one story is finished. Reading on Monday and finishing on Tuesday leaves Monday light and Tuesday full.
-- [ ] Count each finished story once across devices and rereads. Two different completions in one day give one full circle and two stories in the total.
-- [ ] Verify inactive time does not qualify as active reading and the dashboard shows only one weekly total.
+- [x] Leave a day empty after an immediate open and close. Lightly fill it on paragraph advancement, lookup, difficulty mark, or one active reading minute.
+- [x] Fully fill the day when at least one story is finished. Reading on Monday and finishing on Tuesday leaves Monday light and Tuesday full.
+- [x] Count each finished story once across devices and rereads. Two different completions in one day give one full circle and two stories in the total.
+- [x] Verify inactive time does not qualify as active reading and the dashboard shows only one weekly total.
