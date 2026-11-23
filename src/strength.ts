@@ -31,3 +31,10 @@ export function adjustStrength(db: DatabaseSync, kind: ItemKind, text: string, d
   const row = strengthStatements(db).adjust.get(kind,text,delta)!;
   return strength(Number(row.score));
 }
+
+export function recordedStrengths(db: DatabaseSync) {
+  strengthStatements(db);
+  return db.prepare('SELECT kind,text,score FROM reading_strength').all().map(row=>({
+    kind:row.kind as ItemKind, text:String(row.text), score:Number(row.score),
+  }));
+}
