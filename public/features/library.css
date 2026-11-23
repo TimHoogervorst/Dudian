@@ -1,0 +1,26 @@
+.lib-controls,.lib-summary,.lib-pages,.lib-legend,.lib-pieces,.lib-examples {display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.lib-controls,.lib-summary {justify-content:space-between}
+.lib-controls label,.lib-summary,.lib-pages,.lib-sources,.lib-status {font: .88rem/1.5 var(--sans)}
+.lib-controls select {margin-left:.5em}
+.lib-tabs {display:flex;border:1px solid var(--line);border-radius:2rem;padding:3px}
+.lib-tabs a {padding:.48rem 1.2rem;border-radius:2rem}
+.lib-tabs a[aria-current] {background:var(--red);color:var(--paper)}
+.lib-summary {border-block:1px solid var(--line);margin:1.5rem 0 1rem;color:var(--muted);padding:.4rem 0}
+.lib-gray {--strength:#887e72}.lib-green {--strength:#437553}.lib-yellow {--strength:#a4781e}.lib-red {--strength:#a63c39}
+.lib-status {display:inline-flex;align-items:center;gap:6px}
+.lib-status:before,.lib-tile:after {content:'';width:.59rem;height:.59rem;border-radius:100%;background:var(--strength)}
+.lib-grid {display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:9px}
+.lib-tile,.lib-pieces a {display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:#fffbf2}
+.lib-tile {position:relative;min-height:88px;padding:12px 6px;color:var(--ink)}
+.lib-tile:hover,.lib-pieces a:hover {background:#f5e6d1;text-decoration:none}
+.lib-tile:after {position:absolute;right:8px;top:8px}
+.lib-tile strong,.lib-pieces strong {font:1.65rem/1.45 "Songti SC","SimSun",serif}
+.lib-tile span,.lib-pieces span {font:.86rem/1.4 var(--sans);color:var(--muted)}
+.lib-pages {justify-content:center;min-height:3.5rem}.lib-sources {color:var(--muted);margin-top:1rem}
+.lib-entry {max-width:760px;margin:1rem auto;padding:clamp(18px,4vw,44px);border:1px solid var(--line);border-radius:20px;background:#fff8eb}
+.lib-entry header {border-bottom:1px solid var(--line);padding-bottom:1.2rem}
+.lib-entry h1 {font-family:"Songti SC","SimSun",serif;letter-spacing:.04em;margin:.3rem 0}
+.lib-entry h2 {font-size:1.55rem;margin-top:1.25rem}.lib-reading ul {padding-left:1.4rem;line-height:1.55}
+.lib-pieces a,.lib-examples a {padding:8px 14px}
+.lib-examples {gap:6px}.lib-examples a {background:#f3e8d7;border-radius:7px}
+@media(max-width:640px){.lib-controls,.lib-summary{align-items:flex-start}.lib-legend{gap:8px}.lib-grid{grid-template-columns:repeat(auto-fill,minmax(85px,1fr))}.lib-controls{gap:.7rem}.lib-summary{padding:.6rem 0}.lib-summary p{margin:0}}
