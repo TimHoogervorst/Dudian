@@ -41,4 +41,3 @@ test('paragraph tracking ignores restore and programmatic scroll, then flushes a
   scan.programmatic();scan.scrolled();scan.flush();assert.equal(saved,1);
   scan.intent();scan.scrolled();scan.flush();assert.equal(saved,2);
 });
-

@@ -48,4 +48,3 @@ export const ui={
   notice(message) { document.querySelector('#notice').textContent=message; },
   navigate(path) { location.hash=path.startsWith('/')?path:'/'+path; },
 };
-

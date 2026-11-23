@@ -86,4 +86,3 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href===import.met
   const port = Number(process.env.PORT ?? 3000);
   app.listen(port,process.env.HOST ?? '0.0.0.0',()=>console.log('Street Talk is listening on port '+port));
 }
-

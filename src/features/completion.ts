@@ -13,4 +13,3 @@ export default async function completion({url,req,body,store,json}:Context) {
   }else return false;
   return true;
 }
-

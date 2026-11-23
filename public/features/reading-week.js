@@ -62,4 +62,3 @@ export function setup(ui) {
     if(!panel.isConnected)root.append(panel);
   });
 }
-

@@ -6,4 +6,3 @@
 .week-light .day-circle{background:#e8aca1}.week-full .day-circle{background:var(--red);border-color:var(--red)}
 .week-days [aria-current=date]{font-weight:700;color:var(--ink)}
 .week-total{border-top:1px solid var(--line);margin:20px 0 0;padding-top:14px;color:var(--red);font:600 18px var(--serif)}
-

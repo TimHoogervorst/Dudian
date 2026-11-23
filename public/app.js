@@ -43,4 +43,3 @@ try {
   window.addEventListener('hashchange',render);
   await render();
 } catch(e){ui.notice(e.message);}
-

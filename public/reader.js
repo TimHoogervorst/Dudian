@@ -96,4 +96,3 @@ export async function reader({root,parts,signal,onLeave}) {
   showPosition(position.paragraph>0);
   await ui.emit('reader-ready',context);
 }
-

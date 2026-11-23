@@ -21,4 +21,3 @@ test('browsers share resume state through the reader API', async () => {
     assert.match(home,/Street Talk/);
   } finally { server.close(); store.db.close(); }
 });
-

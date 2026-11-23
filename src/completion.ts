@@ -44,4 +44,3 @@ export function finishChapter(store:ReadingStore,storyId:string,chapter:number,n
   }catch(error){db.exec('ROLLBACK');throw error;}
   return completionFor(store,storyId);
 }
-

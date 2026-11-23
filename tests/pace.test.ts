@@ -28,4 +28,3 @@ test('story length adapts after three measured chapters while vocabulary difficu
     assert.equal(buildPlan(slower,'easy',30).ceiling,buildPlan(slower,'easy',10).ceiling);
   } finally {faster.db.close();slower.db.close();}
 });
-

@@ -23,4 +23,3 @@ export function trackParagraph(rectangles,height,save) {
     flush,
   };
 }
-

@@ -8,4 +8,3 @@
 .dictionary-close{display:none}.reader-pref label{font:1rem var(--sans)}
 .usage-history{margin-top:2rem}.usage-history h2{font-size:1.6rem}.usage-history a{font-size:.9rem}
 @media(max-width:640px){.dictionary:not(.has-word){display:none}.dictionary.has-word{position:fixed;bottom:68px;left:10px;right:10px;z-index:6;max-height:40vh;overflow:auto;box-shadow:0 6px 35px #42231832}.dictionary.has-word h2{margin-top:0}.dictionary-close{display:block;float:right;font-size:.85rem}.chapter-text{padding-bottom:1rem}}
-

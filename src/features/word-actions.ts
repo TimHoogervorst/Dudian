@@ -20,4 +20,3 @@ export default async function readerActions({req,url,store,json,body}:Context) {
   } else return false;
   return true;
 }
-

@@ -65,4 +65,3 @@ export function usageHistory(store:ReadingStore,char:string) {
     return {word:String(row.word),at:Number(row.at),storyId:story.id,title:story.title,chapter:Number(row.chapter),sentence:sentenceText(tokens,Number(row.token))};
   });
 }
-

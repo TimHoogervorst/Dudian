@@ -25,4 +25,3 @@ export function targetWordCount(store:ReadingStore,minutes:number) {
   // Clamp unusual measurements such as skipping through a chapter or leaving a tab open.
   return Math.round(minutes*Math.max(4,Math.min(48,median)));
 }
-

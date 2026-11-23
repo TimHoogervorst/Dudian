@@ -10,4 +10,3 @@ export default async function weeklyActivity({req,url,store,json,body}:Context) 
   }else return false;
   return true;
 }
-

@@ -15,4 +15,3 @@ Tap a word once for its meaning in the sentence. Double-tap it to mark difficult
 Use Node 22.16 or later. Run `npm ci` to install the development tools, `npm run typecheck` to check TypeScript, `npm test` to run the tests, and `npm start` to serve the app. Set `DATA_DIR` to choose the data directory and `PORT` to change the HTTP port for native development.
 
 The original application code is MIT licensed. The bundled dictionary and curriculum retain their own licenses. [Application license](LICENSE) · [Product specification and UI references](docs/reading-app.md)
-

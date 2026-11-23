@@ -24,4 +24,3 @@ test('a second reader resumes the seeded chapter at the saved paragraph after re
     rmSync(dir, {recursive:true, force:true});
   }
 });
-

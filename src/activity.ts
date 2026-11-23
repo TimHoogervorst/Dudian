@@ -64,4 +64,3 @@ export function readingWeek(store:ReadingStore,now=Date.now(),zone='UTC'){
   }
   return {days,finished,today};
 }
-

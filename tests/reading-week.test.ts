@@ -39,4 +39,3 @@ test('weekly circles distinguish unfinished activity from distinct finished stor
     assert.equal(readingWeek(store,tuesday+86400000,'Europe/Amsterdam').days[2].state,'light');
   }finally{store.db.close();}
 });
-
