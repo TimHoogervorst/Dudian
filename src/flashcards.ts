@@ -5,6 +5,13 @@ import {HttpError} from './store.ts';
 import {strengthFor,adjustStrength} from './strength.ts';
 
 type DeckRequest = {kind: ItemKind; level?: number; words?: string[]};
+export function flashcardHistory(db: DatabaseSync) {
+  ensureSchema(db);
+  return db.prepare(`SELECT kind,text,count(*) AS count,max(graded_at) AS at
+    FROM flashcard_reviews GROUP BY kind,text`).all().map(r=>({
+      kind:r.kind as ItemKind,text:String(r.text),count:Number(r.count),at:Number(r.at),
+    }));
+}
 function ensureSchema(db: DatabaseSync) {
   db.exec(`CREATE TABLE IF NOT EXISTS flashcard_sessions(
     id TEXT PRIMARY KEY, kind TEXT NOT NULL, deck TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0
