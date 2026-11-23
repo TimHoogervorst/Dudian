@@ -7,7 +7,7 @@ const words: Record<string, [string, string]> = {
   你: ['nǐ', 'you'], 想: ['xiǎng', 'would like'], 什么: ['shénme', 'what'],
   说: ['shuō', 'say'], 一: ['yī', 'one'], 杯: ['bēi', 'cup'], 好: ['hǎo', 'good'],
   这: ['zhè', 'this'], 是: ['shì', 'is'], 的: ['de', 'possessive particle'],
-  水: ['shuǐ', 'water'], 很: ['hěn', 'very'], 热: ['rè', 'hot'],
+  很: ['hěn', 'very'], 热: ['rè', 'hot'],
   外面: ['wàimian', 'outside'], 下雨: ['xiàyǔ', 'rain'], 了: ['le', 'change of state'],
   我们: ['wǒmen', 'we'], 坐: ['zuò', 'sit'], 在: ['zài', 'at'], 这里: ['zhèlǐ', 'here'],
   看: ['kàn', 'look at'], 雨: ['yǔ', 'rain'], 再见: ['zàijiàn', 'goodbye'],
