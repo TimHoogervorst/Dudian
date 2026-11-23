@@ -9,7 +9,9 @@ test('an unplanned word or invalid sense never enters saved story history', asyn
   const plan = {...buildPlan(store,'easy',10),targetWords:2};
   for(const invalid of ['直升机:1','茶:999','我喝茶。']) {
     const candidate = {title:'Tea',chapters:[{title:'Tea',paragraphs:[[[invalid,'。']]]}]};
-    await assert.rejects(generateStory(store,plan,async()=>JSON.stringify(candidate)),/sense/);
+    let requests=0;
+    await assert.rejects(generateStory(store,plan,async()=>JSON.stringify(++requests===1 ? candidate : candidate.chapters[0])),/sense.*Try again/);
+    assert.equal(requests,3);
     assert.deepEqual(store.stories().map(story=>story.id),['tea-shop']);
   }
 });

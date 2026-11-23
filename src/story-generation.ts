@@ -95,7 +95,10 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   for (const char of words.join('')) if (!backgroundCharacters.has(char)) novel.add(char);
   if (novel.size>plan.ceiling) throw new CandidateError('The story exceeds the new-character ceiling.');
   if (count < Math.floor(plan.targetWords*0.6) || count > Math.ceil(plan.targetWords*1.5)) {
-    throw new CandidateError('The story contains '+count+' words; aim for '+plan.targetWords+'.');
+    const sizes=chapters.map(chapter=>chapter.paragraphs.flat().filter(token=>token.entry).length);
+    const size=count<plan.targetWords ? Math.min(...sizes) : Math.max(...sizes);
+    const revisedSize=Math.max(1,size+plan.targetWords-count);
+    throw new CandidateError('The story contains '+count+' words; aim for approximately '+revisedSize+' words in the revised chapter.',sizes.indexOf(size));
   }
   return {title:candidate.title.trim() as string,chapters};
 }
@@ -119,12 +122,33 @@ function previewFor(plan:StoryPlan,chapters:Chapter[]) {
 }
 export async function generateStory(store:ReadingStore,plan:StoryPlan,write:CandidateWriter=generateText) {
   const dictionary = lexicon(plan);
-  const raw = await write(promptFor(plan,dictionary));
+  const instructions = promptFor(plan,dictionary);
+  let prompt = instructions;
   let candidate;
-  try { candidate = JSON.parse(raw); }
-  catch { throw new CandidateError('The story response contained invalid JSON. Please retry.'); }
-  const accepted = validate(candidate,plan,dictionary);
-  const story = {id:randomUUID(),...accepted,preview:previewFor(plan,accepted.chapters)};
-  store.saveStory(story);
-  return story;
+  let chapter: number | undefined;
+  for (let attempt = 0; ; attempt++) {
+    const raw = await write(prompt);
+    try {
+      let revision;
+      try { revision = JSON.parse(raw); }
+      catch { throw new CandidateError('The response contained invalid JSON.',chapter); }
+      if (chapter === undefined) candidate = revision;
+      else candidate.chapters[chapter] = revision;
+      const accepted = validate(candidate,plan,dictionary);
+      const story = {id:randomUUID(),...accepted,preview:previewFor(plan,accepted.chapters)};
+      store.saveStory(story);
+      return story;
+    } catch (error) {
+      if (!(error instanceof CandidateError)) throw error;
+      if (attempt === 2) throw new CandidateError(error.message+' Two corrections were unsuccessful. Try again.');
+      chapter = error.chapter;
+      const feedback = 'Validation feedback: '+error.message;
+      if (chapter === undefined) {
+        prompt = [instructions,feedback,'Supply a corrected complete story.'].join('\n');
+      } else {
+        const scope = 'Revise only chapter '+(chapter+1)+'. Return only its JSON object with title and paragraphs. All other chapters will remain as written.';
+        prompt = [instructions,feedback,scope,'Current draft:',JSON.stringify(candidate)].join('\n');
+      }
+    }
+  }
 }
