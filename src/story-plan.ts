@@ -1,4 +1,5 @@
 import { catalog } from './catalog.ts';
+import { targetWordCount } from './pace.ts';
 import { HttpError, type ReadingStore } from './store.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
@@ -46,6 +47,6 @@ export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: 10
   const candidates = [...new Set([...common,...background])].filter(word =>
     background.includes(word) && [...word].length === 1 && catalog.get('character',word));
   const newCharacters = candidates.slice(0,ceiling);
-  return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:minutes*16,
+  return {difficulty,minutes,chapterCount:minutes===30 ? 3 : 1,targetWords:targetWordCount(store,minutes),
     ceiling,background,newCharacters,newWords:[...newCharacters],reviewWords:[]};
 }
