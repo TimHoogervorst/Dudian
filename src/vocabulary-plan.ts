@@ -1,0 +1,107 @@
+import {catalog} from './catalog.ts';
+import {recordedStrengths} from './strength.ts';
+import {ensureActions} from './word-actions.ts';
+import {flashcardHistory} from './flashcards.ts';
+import type {ReadingStore} from './store.ts';
+import {ensureCompletions} from './completion.ts';
+
+const day = 86_400_000;
+
+function readingEvidence(store:ReadingStore) {
+  const {db}=store;
+  ensureCompletions(db);
+  const recent=db.prepare(`SELECT c.story_id,c.chapter,c.at,
+    json_extract(s.content,'$.chapters['||c.chapter||'].paragraphs') AS paragraphs
+    FROM chapter_completions c JOIN stories s ON s.id=c.story_id ORDER BY c.at DESC`).all();
+  const seen=new Map<string,{count:number;at:number}>();
+  let aided=0, encountered=0;
+  for (const [index,row] of recent.entries()) {
+    const paragraphs=JSON.parse(String(row.paragraphs));
+    const words=new Set<string>(paragraphs.flat().map((t:{text:string})=>t.text).filter((w:string)=>/\p{Script=Han}/u.test(w)));
+    for (const word of words) {
+      const last=seen.get(word);
+      seen.set(word,{count:(last?.count??0)+1,at:last?.at??Number(row.at)});
+    }
+    if(index<3) {
+      encountered+=words.size;
+      const actions=db.prepare('SELECT count(DISTINCT word) AS count FROM word_actions WHERE story_id=? AND chapter=? AND at<=?')
+        .get(row.story_id,row.chapter,row.at);
+      aided+=Number(actions?.count??0);
+    }
+  }
+  return {seen,chapters:recent.length,comfortable:recent.length>=2 && aided/Math.max(1,encountered)<=0.15};
+}
+
+export function vocabularyFor(store:ReadingStore, ceiling:number, now:number) {
+  const {db}=store;
+  const strengths=recordedStrengths(db);
+  const attempts=flashcardHistory(db);
+  ensureActions(db);
+  const reading=readingEvidence(store);
+  const marks=db.prepare("SELECT word,max(at) AS at FROM word_actions WHERE kind='difficulty' GROUP BY word").all();
+  const lastMark=new Map(marks.map(row=>[String(row.word),Number(row.at)]));
+  const eligible=(word:string)=>!lastMark.has(word) || now-lastMark.get(word)!>=day;
+  const knownWords=new Set(strengths.filter(i=>i.kind==='word').map(i=>i.text));
+  const knownCharacters=new Set(strengths.filter(i=>i.kind==='character').map(i=>i.text));
+  const baseline=catalog.list('word',1);
+  const background=[...new Set([...baseline.map(i=>i.text),...knownWords,...lastMark.keys()])];
+  const allowedBackground=new Set(background);
+  const attemptsByItem=new Map(attempts.map(a=>[a.kind+'/'+a.text,a]));
+
+  const candidates=strengths.map(item=>{
+    const word = item.kind==='word' || knownWords.has(item.text) || baseline.some(i=>i.text===item.text)
+      ? item.text : catalog.get('character',item.text)?.examples.find(i=>eligible(i.text) && allowedBackground.has(i.text))?.text;
+    const history=attemptsByItem.get(item.kind+'/'+item.text);
+    const seen=reading.seen.get(word??'');
+    return {...item,word,count:(history?.count??0)+(seen?.count??0),at:Math.max(history?.at??0,seen?.at??0,lastMark.get(word??'')??0)};
+  }).filter(item=>item.word && eligible(item.word) && item.score<6)
+    .sort((a,b)=>a.score-b.score || a.count-b.count || a.at-b.at || a.text.localeCompare(b.text));
+  const reviews=[...new Set(candidates.map(i=>i.word!))];
+  const difficult=new Set(candidates.filter(i=>i.score<0).map(i=>i.word));
+  const reviewWords=reviews.slice(0,3);
+  const slots=Math.max(0,ceiling-Math.min(ceiling,difficult.size));
+  const budget=difficult.size>=3 ? 0 : slots;
+  const common=['茶','水','家','人','书','好','看','吃','来','去'];
+  const newCharacters:string[]=[], newWords:string[]=[];
+  const addTarget=(text:string,word:string)=>{
+    if (!eligible(word) || knownCharacters.has(text) || newCharacters.includes(text) || knownWords.has(word) || reviewWords.includes(word)) return;
+    newCharacters.push(text);
+    if (!newWords.includes(word)) newWords.push(word);
+  };
+
+  // Introduce the next band occasionally after two comfortable chapter completions.
+  // Higher bands open once most of the preceding band's words have been encountered.
+  let nextLevel=2;
+  while (nextLevel<6) {
+    const band=catalog.list('word',nextLevel);
+    if (band.filter(i=>knownWords.has(i.text)).length < band.length*0.75) break;
+    nextLevel++;
+  }
+  const nextBand=catalog.list('word',nextLevel);
+  const availableCharacters=new Set(background.join(''));
+  const unresolved=strengths.filter(i=>i.score<0).length;
+  if (budget && reading.comfortable && unresolved<=2 && reading.chapters%3===2) {
+    for (const {text:word} of nextBand) {
+      const novel=[...new Set(word)].filter(c=>!availableCharacters.has(c));
+      if (novel.length!==1 || catalog.get('character',novel[0])?.level!==nextLevel) continue;
+      addTarget(novel[0],word);
+      if (newWords.length) break;
+    }
+  }
+  const favored=[...new Set([...common,...baseline.map(i=>i.text)])];
+  for (const word of favored) {
+    if (newCharacters.length>=budget) break;
+    if ([...word].length===1) addTarget(word,word);
+  }
+  for (const {text:word} of baseline) {
+    for (const char of word) {
+      if (newCharacters.length>=budget) break;
+      addTarget(char,word);
+    }
+    if (newCharacters.length>=budget) break;
+  }
+  const compound=budget>0 && reading.comfortable ? nextBand.find(({text})=>
+    [...text].length>1 && !allowedBackground.has(text) && eligible(text)
+    && !newWords.includes(text) && [...text].every(c=>knownCharacters.has(c)))?.text : undefined;
+  return {background,newCharacters,newWords,reviewWords,compound};
+}
