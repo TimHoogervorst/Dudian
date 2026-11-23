@@ -1,0 +1,6 @@
+.git
+.work
+runtime
+node_modules
+.env
+.scratch

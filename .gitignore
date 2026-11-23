@@ -1,0 +1,6 @@
+.work/
+runtime/
+node_modules/
+.env
+*.sqlite-shm
+*.sqlite-wal
