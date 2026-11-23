@@ -4,6 +4,23 @@ import {ReadingStore} from '../src/store.ts';
 import {strengthFor} from '../src/strength.ts';
 import {recordAction, usageHistory} from '../src/word-actions.ts';
 
+test('every word occurrence in the saved example resolves offline',()=>{
+  const store=new ReadingStore();
+  try {
+    const story=store.story('tea-shop');
+    for(const [chapter,part] of story.chapters.entries()){
+      for(const [paragraph,line] of part.paragraphs.entries()){
+        for(const [token,word] of line.entries()){
+          if(!word.meaning)continue;
+          const result=recordAction(store,{storyId:story.id,chapter,paragraph,token,id:[chapter,paragraph,token].join('/'),kind:'lookup'});
+          assert.equal(result.text,word.text);
+          assert.ok(result.pinyin);
+        }
+      }
+    }
+  }finally{store.db.close();}
+});
+
 test('an offline contextual lookup and a retried difficulty mark have distinct consequences',()=>{
   const store=new ReadingStore();
   try {

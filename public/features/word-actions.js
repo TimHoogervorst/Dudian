@@ -17,11 +17,13 @@ export function setup(ui) {
     };
     label.append(input,' Show pinyin above words');panel.append(el('h2','Reading'),label);root.append(panel);
   });
-  ui.on('reader',async ({story,position,article,aside})=>{
+  ui.on('reader',async context=>{
+    const {story,position,article,aside}=context;
     const {pinyin}=await api('/api/reader-preferences');
     const chapter=position.chapter;
     let sequence=0;
     let pending;
+    const saving=new Set();
     async function select(word,kind) {
       const action=++sequence;
       const paragraph=Number(word.dataset.paragraph),token=Number(word.dataset.token);
@@ -31,14 +33,20 @@ export function setup(ui) {
       word.classList.add('selected-word');
       const form=el('strong',meaning.text,'dictionary-word');form.lang='zh-Hans';
       const mark=el('button',kind==='difficulty'?'Marked for review':'Mark as difficult');
-      mark.disabled=kind==='difficulty';mark.onclick=()=>{mark.disabled=true;select(word,'difficulty').catch(e=>{mark.disabled=false;ui.notice(e.message);});};
+      mark.disabled=kind==='difficulty';mark.onclick=()=>{mark.disabled=true;write(word,'difficulty').catch(()=>{mark.disabled=false;});};
       aside.replaceChildren(el('h2','Dictionary'),form,el('p',meaning.pinyin,'dictionary-reading'),el('p',meaning.meaning),mark,
         link('View word in Library','#/library/word/entry/'+encodeURIComponent(meaning.text)+'/'+meaning.sense,'word-detail'));
       aside.classList.add('has-word');
       const dismiss=el('button','Close','dictionary-close');
       dismiss.onclick=()=>aside.classList.remove('has-word');aside.prepend(dismiss);
     }
-    function action(word,kind) { select(word,kind).catch(error=>ui.notice(error.message)); }
+    function write(word,kind) {
+      const request=select(word,kind);
+      saving.add(request);
+      request.then(()=>saving.delete(request),error=>{saving.delete(request);ui.notice(error.message);});
+      return request;
+    }
+    function action(word,kind) { void write(word,kind); }
     function clearPending() {
       if(pending)clearTimeout(pending.timer);
       pending=undefined;
@@ -48,6 +56,10 @@ export function setup(ui) {
       if(pending){const previous=pending.word;clearPending();action(previous,'lookup');}
       pending={word,timer:setTimeout(()=>{clearPending();action(word,'lookup');},300)};
     }
+    context.flushWordActions=async ()=>{
+      if(pending){const word=pending.word;clearPending();action(word,'lookup');}
+      await Promise.all(saving);
+    };
     for(const span of article.querySelectorAll('[data-word]')) {
       const token=story.chapters[chapter].paragraphs[Number(span.dataset.paragraph)][Number(span.dataset.token)];
       span.tabIndex=0;span.setAttribute('role','button');span.setAttribute('aria-label','Look up '+token.text);
