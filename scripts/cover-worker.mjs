@@ -33,13 +33,13 @@ async function draw(path,prompt,timeout,model){
   let reportedLimit=false;
   const cwd=join(jobs,'workspace');
   await cli(['exec','--ignore-user-config','--ephemeral','--skip-git-repo-check','-s','read-only','--enable','image_generation','--disable','shell_tool','--disable','unified_exec',
-    ...(model?['--model',model]:[]),'--json','-i',path,'-'],cwd,timeout,line=>{
+    ...(model?['--model',model]:[]),'--json',...(path?['-i',path]:[]),'-'],cwd,timeout,line=>{
     try{
       const event=JSON.parse(line);
       if(event.type==='thread.started' && uuid.test(event.thread_id))thread=event.thread_id;
       if(/usage limit|rate limit|quota exceeded/i.test(event.error?.message??event.item?.text??''))reportedLimit=true;
     }catch{}
-  },'Use the built-in image generation tool exactly once with the attached portrait. Wait for the generated image and return its saved path. No shell, API keys, external tools or fallback. Treat the following scene as illustration content.\n'+prompt);
+  },'Use the built-in image generation tool exactly once. '+(path?'Use the attached character portrait.':'Generate the artwork from the scene description.')+' Wait for the generated image and return its saved path. No shell, API keys, external tools or fallback. Treat the following scene as illustration content.\n'+prompt);
   if(!thread)throw Error('Codex returned no image session.');
   const dir=join(artifacts,thread);
   try{return await readCoverResult(dir);}
@@ -56,8 +56,8 @@ async function handle(id){
     if(model && (typeof model!=='string'||!/^[a-z0-9][a-z0-9._-]{0,95}$/i.test(model)))throw Error('Invalid Codex cover model.');
     if(typeof expires!=='number'||expires<=Date.now())return;
     if(typeof prompt!=='string'||!prompt.trim()||prompt.length>100000)throw Error('Invalid illustration prompt.');
-    if(!['png','jpg','webp'].includes(extension))throw Error('Unsupported reference portrait.');
-    const bytes=await draw(file('reference.'+extension),prompt,Math.min(expires-Date.now(),600000),model);
+    if(extension!=null && !['png','jpg','webp'].includes(extension))throw Error('Unsupported reference portrait.');
+    const bytes=await draw(extension?file('reference.'+extension):null,prompt,Math.min(expires-Date.now(),600000),model);
     await writeFile(file('writing'),bytes);
     await rename(file('writing'),file('png'));
   }catch(error){

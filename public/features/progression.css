@@ -1,0 +1,40 @@
+.progression-heading h1{margin:0}
+.progression-heading p{color:var(--muted);margin:.35rem 0;font:600 1rem var(--sans)}
+.roadmap-scale{padding:2.6rem 1.25rem 2rem;margin:.5rem 0 1rem}
+.roadmap-rail{position:relative;height:4px;background:linear-gradient(to right,var(--red) var(--position),var(--line) var(--position))}
+.roadmap-tick,.roadmap-marker{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.roadmap-tick{top:0;padding:1rem .15rem .35rem;border:0;border-radius:.25rem;background:transparent;color:var(--muted);font:600 clamp(.69rem,1.4vw,.95rem) var(--sans)}
+.roadmap-tick::before{content:"";position:absolute;left:50%;top:2px;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:50%;border:2px solid #a58e77;background:var(--paper)}
+.roadmap-tick.reached::before{background:var(--red);border-color:var(--red)}
+.roadmap-tick[aria-pressed=true]{color:var(--red);text-decoration:underline;text-underline-offset:.28em}
+.roadmap-tick[aria-pressed=true]::before{outline:2px solid var(--red);outline-offset:2px}
+.roadmap-filters{display:flex;flex-wrap:wrap;gap:.4rem}
+.roadmap-filters button{font:600 .8rem var(--sans);padding:.35rem .65rem;border-radius:1rem}
+.roadmap-filters [aria-pressed=true]{background:var(--red);color:var(--paper)}
+.roadmap-marker{pointer-events:none;bottom:.7rem;left:var(--position);background:var(--red);border-radius:.35rem;padding:.22rem .55rem;color:white;font:650 .86rem var(--sans)}
+.roadmap-marker::after{content:"";position:absolute;left:50%;top:100%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--red)}
+.roadmap-summary{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:14px;background:#fff8eb;padding:1rem 1.3rem;gap:1.3rem}
+.roadmap-summary section+section{border-left:1px solid var(--line);padding-left:1.3rem}
+.roadmap-summary h2{margin:0;font-size:1.14rem}
+.roadmap-summary p{margin:.35rem 0 0;font-family:var(--sans)}
+.roadmap-summary .hsk-progress-track{margin:0}
+.milestone-group{margin-top:2rem}
+.milestone-group ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,11.8rem),1fr));gap:.75rem;padding:0;list-style:none}
+.milestone-group li{display:flex;flex-direction:column;gap:.6rem;min-height:7.8rem;border:1px solid var(--line);border-radius:.65rem;padding:1rem;background:#fff8eb}
+.format-threshold{display:flex;align-items:center;justify-content:space-between;color:var(--red);font:600 .8rem var(--sans)}
+.milestone-group li strong{font-size:1.15rem}
+.milestone-group small{margin-top:auto;color:var(--muted);font:.8rem var(--sans)}
+.milestone-group li.locked{background:#ebe8e2;border-color:#d4cec5;color:#59544f}
+.locked .format-threshold,.milestone-group .locked small{color:#635f59}
+@media(max-width:600px){.roadmap-summary{grid-template-columns:1fr}.roadmap-summary section+section{border-left:0;border-top:1px solid var(--line);padding:.8rem 0 0}.milestone-group ol{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.reading-subtype,.message-author,.document-label{display:block;color:var(--muted);font:500 .8rem var(--sans)}
+.reading-subtype{margin-top:.2rem}
+.chapter-text.message-thread p{width:fit-content;max-width:82%;padding:.6rem 1rem;border-radius:1rem;background:#efe8da;margin:.75rem auto .1rem 0}
+.chapter-text.message-thread .outgoing{margin-left:auto;margin-right:0;background:#e1eddf}
+.message-thread .outgoing + details{margin-left:auto;width:fit-content}
+.message-author,.document-label{margin-bottom:.35rem}
+.chapter-text .document-signature{text-align:right}
+.chapter-text .document-lead{font-weight:600}
+.chapter-text.baby-pages p{padding:1.25rem 0;min-height:5rem;font-size:1.24em}
+@media(max-width:640px){#nav a{padding-inline:.4rem}}
+.inside-baby-book .inline-check{display:none}

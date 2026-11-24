@@ -1,10 +1,13 @@
 import {el} from './ui.js';
+export function displayLevel(level){
+  return level>0 && level<0.01?'<0.01':String(Math.floor(level*100)/100);
+}
 export function readingProgress(level,projected){
   const start=Math.min(5,Math.floor(level));
   const milestone=start+1;
   const panel=el('section',null,'hsk-progress');
   const heading=el('div',null,'hsk-progress-heading');
-  const display=level>0 && level<0.01?'<0.01':String(Math.floor(level*100)/100);
+  const display=displayLevel(level);
   heading.append(el('h2','HSK reading progress'),el('strong',display));
   const track=el('div',null,'hsk-progress-track');
   track.setAttribute('role','meter');

@@ -15,16 +15,16 @@ export async function coverWorkerModels():Promise<string[]> {
     return Array.isArray(models)?models.filter(m=>typeof m==='string'):[];
   }catch{return [];}
 }
-export async function subscriptionCover(prompt:string,reference:Buffer,model='') {
+export async function subscriptionCover(prompt:string,reference:Buffer|undefined,model='') {
   if(!await workerOnline())throw Error('Start the Dudian cover worker on the Docker host, then retry.');
   if(model && !(await coverWorkerModels()).includes(model))throw Error('The selected Codex cover model is unavailable. Check the worker and choose another model in Settings.');
   const dir=directory(),id=randomUUID(),path=(suffix:string)=>join(dir,id+'.'+suffix);
-  const extension=reference[0]===255?'jpg':reference[0]===137?'png':'webp';
-  const input='reference.'+extension;
+  const extension=!reference?null:reference[0]===255?'jpg':reference[0]===137?'png':'webp';
+  const input=extension?'reference.'+extension:undefined;
   await mkdir(dir,{recursive:true});
   const expires=Date.now()+12*60_000;
   try{
-    await writeFile(path(input),reference);
+    if(input && reference)await writeFile(path(input),reference);
     await writeFile(path('tmp'),JSON.stringify({prompt,expires,extension,model}));
     await rename(path('tmp'),path('job'));
     while(Date.now()<expires){
@@ -40,6 +40,6 @@ export async function subscriptionCover(prompt:string,reference:Buffer,model='')
     }
     throw Error('The subscription cover took too long. Try again.');
   }finally{
-    await Promise.all(['tmp','job','png','error',input].map(s=>unlink(path(s)).catch(()=>{})));
+    await Promise.all(['tmp','job','png','error',...(input?[input]:[])].map(s=>unlink(path(s)).catch(()=>{})));
   }
 }

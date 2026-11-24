@@ -32,7 +32,7 @@ export function setup(ui) {
       const action=++sequence;
       const paragraph=Number(word.dataset.paragraph),token=Number(word.dataset.token);
       const id=cover && kind==='difficulty'?'cover/'+story.id+'/'+token:actionId();
-      const meaning=kind==='preview'?story.cover.tokens[token]:
+      const meaning=kind==='preview'?(cover?story.cover.tokens[token]:story.chapters[chapter].paragraphs[paragraph][token]):
         await api('/api/word-action',{storyId:story.id,chapter,paragraph,token,kind,id});
       if(cover && kind==='difficulty' && !meaning.cast)word.classList.add('marked-word');
       if(cover && meaning.color)context.onStrengthChange?.(meaning.text,meaning.color);
@@ -84,11 +84,9 @@ export function setup(ui) {
     for(const span of article.querySelectorAll('[data-word]')) {
       const index=Number(span.dataset.token);
       const token=cover?story.cover.tokens[index]:story.chapters[chapter].paragraphs[Number(span.dataset.paragraph)][index];
-      if(cover){
-        if(marked.includes(index))span.classList.add('marked-word');
-        span.onpointerenter=e=>{if(e.pointerType==='mouse')action(span,'preview');};
-        span.onfocus=()=>action(span,'preview');
-      }
+      if(cover && marked.includes(index))span.classList.add('marked-word');
+      span.onpointerenter=e=>{if(e.pointerType==='mouse')action(span,'preview');};
+      span.onfocus=()=>action(span,'preview');
       span.tabIndex=0;span.setAttribute('role','button');span.setAttribute('aria-label','Look up '+token.text);
       if(pinyin && token.pinyin) {
         const ruby=el('ruby',token.text);ruby.append(el('rt',token.pinyin));span.replaceChildren(ruby);
@@ -110,7 +108,7 @@ export function setup(ui) {
     const section=el('section',null,'usage-history');section.append(el('h2','Marked in context'));
     for(const row of rows) {
       const item=el('p');item.append(el('strong',row.word+' · '),el('span',row.sentence),el('br'),
-        row.chapter===-1?link(row.title+' · Cover','#/introduction/'+encodeURIComponent(row.storyId)):
+        row.chapter===-1?link(row.title+' · Introduction','#/introduction/'+encodeURIComponent(row.storyId)):
           link(row.title,'#/read/'+encodeURIComponent(row.storyId)+'/'+row.chapter));
       section.append(item);
     }

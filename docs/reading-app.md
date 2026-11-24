@@ -6,8 +6,10 @@ An open-source TypeScript web app runs locally in Docker with one seeded admin l
 
 ### The reading loop
 
-1. Start on a dashboard showing reading activity and progress. Put Practice, Library, and Settings in the bottom navigation on mobile and at the top on desktop.
-2. Choose Practice → Reading. Short, medium, and long stories contain one, two, and five chapters respectively. Each easy chapter has one paragraph, medium has two, and hard has three or four. Aim for about 40 segmented words per paragraph.
+The progression for Book, Article, and Dialogue is described in [Reading types and progression](reading-types.md).
+
+1. Start on a dashboard showing reading activity and progress. Put Practice, Library, Progression, and Settings in the bottom navigation on mobile and at the top on desktop. Progression shows the current HSK progress score and the unlock requirements for each reading milestone.
+2. Choose Practice → Reading. Short, medium, and long stories contain one, two, and five chapters respectively. In the existing children’s book format, each easy chapter has one paragraph, medium has two, and hard has three or four. Aim for about 40 segmented words per paragraph.
 3. Choose Easy, Medium, or Hard when generating a story. Tailor the story to introduce new characters or revisit material the learner struggles with or has had little practice reading. A story at any difficulty may focus entirely on review. Preview the new characters with their meanings and pronunciations before reading.
 4. Validate the entire story before showing its introduction. Check the promised targets and vocabulary budget, then save its chapters and word annotations together so resumed sessions show the same text.
    Show simplified Chinese with small pinyin controlled by a persistent Settings preference. A single tap on a word reveals its English meaning in the sentence. A double-tap explicitly marks difficulty with that word.
@@ -69,13 +71,13 @@ The supplied illustrations establish the warm paper palette, deep red controls, 
 
 ### 包包 and illustrated story covers
 
-Dudian (读点) is the app name. 包包 (Bāobāo) drives the action in every newly generated story. Beginner stories use a small, concrete goal with a visible outcome, like catching a train with Dad. More advanced stories can revisit the same setting with richer language and more complicated situations.
+Dudian (读点) is the app name. 包包 (Bāobāo) drives the action in children’s books and can appear in baby books. Beginner stories use a small, concrete goal with a visible outcome, like catching a train with Dad. More advanced stories can revisit the same setting with richer language and more complicated situations.
 
 Start with 包包 and everyday family life. Mom and Dad can appear in early scenes. The intended progression introduces more relatives, such as a younger sister and an uncle, as the learner gains distinct Strong characters. Introduced cast members stay available. Other food characters are a future expansion. Add Meet the cast to the Library, beginning with 包包’s portrait, name, pinyin, and a short introduction.
 
 Allow approved cast names in stories as names. Selecting 包包 shows the character’s name and introduction. Name occurrences consume no teaching slot and award no vocabulary strength. Ordinary vocabulary uses of the same written characters follow the usual learning rules.
 
-Each new story has one cover illustration based on a scene from its accepted text and the approved 包包 reference portrait. Use the illustration for the story thumbnail and cover page. The cover includes a one- or two-sentence Chinese teaser in the approved vocabulary, the chapter list, and Start reading. Continue reading resumes the saved paragraph. Make the text available as soon as it and the comprehension checks are ready. Display the reference portrait while illustration is pending or unavailable, and allow artwork retries for the same story.
+Each new story has one cover illustration based on a scene from its accepted text using the approved 包包 reference portrait only at the children’s book stage. Use the illustration for the story thumbnail and Introduction. The cover includes a one- or two-sentence Chinese teaser in the approved vocabulary, the chapter list, and Start reading. Continue reading resumes the saved paragraph. Make the text available as soon as it and the comprehension checks are ready. Display a reading-appropriate placeholder while illustration is pending or unavailable, and allow artwork retries for the same story.
 
 ### UI reference screenshots
 
@@ -86,13 +88,13 @@ Each new story has one cover illustration based on a scene from its accepted tex
 
 ### First release of the cast and cover
 
-包包 is the only named cast member with a profile. Every new story names 包包 in the reading text. 妈妈 and 爸爸 are ordinary family vocabulary. Apply the cast-name rule to the cover teaser and comprehension questions too. A question about whom 包包 accompanied can test 爸爸.
+包包 is the only named cast member with a profile. Every Bāobāo children’s book names 包包 in the reading text. 妈妈 and 爸爸 are ordinary family vocabulary. Apply the cast-name rule to the cover teaser and comprehension questions too. A question about whom 包包 accompanied can test 爸爸.
 
-Extend the existing story introduction into the cover. Keep its New this story and Practice again vocabulary sections with pronunciation and meanings. Show the cover illustration, short Chinese teaser, Start reading, and chapter list on this page.
+Label the opening page Introduction across reading types. Keep its New this story and Practice again vocabulary sections with pronunciation and meanings. Show the cover illustration, short Chinese teaser, Start reading, and chapter list on this page.
 
 Dudian uses the Sign in with ChatGPT open-source preview for story text. As verified on 23 November 2026, its plan-funded inference route excludes image generation even when the selected model accepts image input. [OpenAI preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)
 
-Offer both artwork paths in the first release. By default, show the approved 包包 portrait and offer **Copy illustration prompt** and **Import cover**. The learner can use the story’s scene description and reference portrait in ChatGPT Images, then import the illustration for that story. Use the imported image on the cover and in the story overview.
+Offer both artwork paths in the first release. Offer **Copy illustration prompt** and **Import cover**. The learner can use the story’s scene description and any applicable reference portrait in ChatGPT Images, then import the illustration for that story. Use the imported image on the cover and in the story overview.
 
 Automatic artwork uses a host Codex worker signed in with ChatGPT. New installations enable subscription covers by default. Existing learners keep their automatic-generation preference. Separately billed API artwork requires explicitly choosing the API provider. The cover, vocabulary preview, and reader are available while the illustration is being drawn.
 

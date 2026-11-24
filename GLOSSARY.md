@@ -4,8 +4,20 @@ The learner reads Chinese stories and uses encounters with unfamiliar language t
 
 ## Language
 
+**Reading type**
+
+The form of reading the learner chooses for a practice session. Book uses narrative prose, Article presents material such as notices, letters, recipes, and reports, and Dialogue presents a conversation as messages.
+
+**Reading subtype**
+
+A more specific form within a reading type, such as a children’s book or a recipe. The learner’s HSK progress guides which subtypes can appear.
+
 **Character**  
 A single written Chinese symbol, such as 东. Its Library entry links to words that contain it.
+
+**Introduction**
+
+The opening page of a reading session. It presents the cover illustration, teaser, chapters, and vocabulary preview before the learner starts reading.
 
 **Word**  
 A vocabulary entry made up of one or more characters, such as 东西. A word can be looked up in a story and practiced as a whole flashcard.
@@ -54,7 +66,7 @@ The learner’s thumbs-up or thumbs-down judgment of a story.
 
 **Comprehension check**
 
-A short set of multiple-choice questions the learner answers at the end of a chapter. Each question tests the meaning of specific vocabulary through something that happened in that chapter.
+A short set of multiple-choice questions the learner answers at the end of a chapter. Each question tests vocabulary through the chapter’s events, messages, or information.
 
 **Flashcard review**  
 A practice attempt in which the learner recalls the pronunciation and meaning of the displayed Chinese, reveals the answer, and assesses their recall.

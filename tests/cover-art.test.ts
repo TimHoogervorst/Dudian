@@ -24,7 +24,8 @@ test('subscription retries never invoke the paid provider, including with a save
   queueArtwork(store,'rain',paid,async()=>{throw Error('Subscription limit reached');});
   await nextTurn();
   assert.equal(store.db.prepare('SELECT error FROM story_art').get()?.error,'Subscription limit reached');
-  const draw=async(prompt:string,reference:Buffer)=>{
+  const draw=async(prompt:string,reference:Buffer|undefined)=>{
+    assert.ok(reference);
     assert.equal(prompt,'Draw 包包 in the rain.');images++;
     return reference;
   };
@@ -89,4 +90,40 @@ test('cover defaults, API key privacy, edits, failures, retries and manual impor
   await nextTurn();
   assert.equal((await (await fetch(path+'status')).json()).status,'imported');
   assert.deepEqual(Buffer.from(await (await fetch(path+'image')).arrayBuffer()),png);
+});
+
+test('artwork for a document uses its prompt without a character portrait',async t=>{
+  const store=fixture();
+  t.after(()=>store.db.close());
+  const story=store.story('rain');
+  store.saveStory({...story,id:'notice',cover:{teaser:'下雨了。',prompt:'A station notice',reference:false}});
+  setArtSettings(store,{provider:'api',enabled:true,key:'test'});
+  queueArtwork(store,'notice',async(url,options)=>{
+    assert.equal(url,'https://api.openai.com/v1/images/generations');
+    assert.equal(JSON.parse(String(options?.body)).prompt,'A station notice');
+    const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1sAAAAASUVORK5CYII=';
+    return Response.json({data:[{b64_json:png}]});
+  });
+  await nextTurn();
+  assert.equal(store.db.prepare("SELECT status FROM story_art WHERE id='notice'").get()?.status,'ready');
+});
+
+test('saved baby books featuring Bāobāo use the standalone template on retry',async t=>{
+  const store=fixture();
+  t.after(()=>store.db.close());
+  const old=store.story('rain');
+  store.saveStory({...old,id:'baby',format:{type:'book',stage:'Baby book'},
+    cover:{...old.cover!,reference:true,prompt:'Match 包包 in the supplied reference.'}});
+  setArtSettings(store,{provider:'subscription',enabled:true});
+  let called=false;
+  queueArtwork(store,'baby',undefined,async(prompt,reference)=>{
+    called=true;
+    assert.ok(reference===undefined,'expected a portrait-free job');
+    assert.doesNotMatch(prompt,/supplied reference/);
+    assert.match(prompt,/gouache/);
+    throw Error('fixture complete');
+  });
+  await nextTurn();
+  assert.ok(called);
+  assert.equal(store.db.prepare("SELECT error FROM story_art WHERE id='baby'").get()?.error,'fixture complete');
 });

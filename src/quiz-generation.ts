@@ -12,14 +12,14 @@ export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:str
   const count=storyDifficulty[plan.difficulty].questions;
   const targetChars=new Set([...plan.newCharacters,...plan.reviewCharacters??[]]);
   const source=chapter.paragraphs.map((tokens,i)=>
-    'Paragraph '+i+': '+tokens.map((t,j)=>j+'='+t.text).join(' '));
+    'Paragraph '+i+(chapter.names && chapter.speakers?' (speaker '+chapter.names[chapter.speakers[i]]+')':'')+(chapter.sections?' ('+chapter.sections[i]+')':'')+': '+tokens.map((t,j)=>j+'='+t.text).join(' '));
   const instructions=[
     'Write a chapter comprehension check. Return JSON {"questions":[...]} only.',
     'Write exactly '+count+' factual comprehension question(s) about this chapter. Test a different detail in each, drawing on different sentences and teaching targets where possible. Use three plausible distinct choices per question, exactly one supported by the cited sentence. Vary correct answer positions.',
     'Each question has prompt, choices, correct (0-2), word (the exact tested Chinese word), paragraph and token (its zero-based indices in the source), and characters (explicitly tested target characters within that word, or []).',
     'For prompt and each choice use {"zh":["segmented","words"],"en":"natural English translation"}. Each zh token must be an allowed word or Chinese punctuation.',
     'Prioritize these teaching or review words where they occur: '+[...plan.newWords,...plan.reviewWords,plan.compound].filter(Boolean).join('、'),
-    '包包 is a cast name allowed in prompts and choices. Cite an ordinary vocabulary word as the learning target.',
+    'Use only allowed words and participant names in prompts and choices. Cite an ordinary vocabulary word as the learning target.',
     'Eligible target characters: '+[...targetChars].join('、'),
     'Allowed words: '+words.join('、'),
     'Chapter paragraphs with indexed tokens:',...source

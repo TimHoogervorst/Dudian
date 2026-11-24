@@ -1,3 +1,4 @@
+import {coverTemplate} from './cover-template.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { seedStory } from './seed.ts';
 import {migrateEncounters} from './encounters.ts';
@@ -12,7 +13,7 @@ export interface ChapterQuestion {
   word:string; sense:string|number; characters:string[];
 }
 export interface PreviewItem {text:string;pinyin?:string;meaning?:string;example?:string}
-export interface Story { id: string; title: string; difficulty?:Difficulty; preview?:{wordReview?:PreviewItem[];characters:PreviewItem[];reviewCharacters?:string[]; words?:PreviewItem[];review:PreviewItem[];compound?:PreviewItem}; cover?:{teaser:string;prompt:string;tokens?:Token[]}; chapters: { title: string; paragraphs: Token[][]; translations?:(string|null)[]; questions?:ChapterQuestion[] }[] }
+export interface Story { format?:import('./reading-types.ts').ReadingFormat; id: string; title: string; difficulty?:Difficulty; preview?:{wordReview?:PreviewItem[];characters:PreviewItem[];reviewCharacters?:string[]; words?:PreviewItem[];review:PreviewItem[];compound?:PreviewItem}; cover?:{reference?:boolean;teaser:string;prompt:string;tokens?:Token[]}; chapters: { speakers?:number[];names?:string[];sections?:string[]; title: string; paragraphs: Token[][]; translations?:(string|null)[]; questions?:ChapterQuestion[] }[] }
 export interface Position { chapter: number; paragraph: number }
 export class HttpError extends Error {
   status: number;
@@ -70,6 +71,7 @@ export class ReadingStore {
       story.cover.tokens=recoverCoverTokens(story);
       this.db.prepare('UPDATE stories SET content=? WHERE id=?').run(JSON.stringify(story),id);
     }
+    if(story.format && story.cover)Object.assign(story.cover,coverTemplate(story));
     return story;
   }
   stories() {

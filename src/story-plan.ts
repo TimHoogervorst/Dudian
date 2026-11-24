@@ -11,6 +11,7 @@ export function validLength(value:unknown): value is StoryLength {
 }
 export interface Preferences {difficulty:Difficulty; ceilings:Record<Difficulty,number>}
 export interface StoryPlan {
+  format?:import('./reading-types.ts').ReadingFormat;
   subject?:import('./practice-subjects.ts').Subject;
   difficulty: Difficulty;
   minutes: StoryLength;

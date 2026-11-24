@@ -36,10 +36,18 @@ export default async function art({url,req,res,store,json,body}:Context) {
     const match=url.pathname.match(/^\/api\/stories\/([^/]+)\/art\/(image|status|retry)$/);
     if(!match)return false;
     const id=decodeURIComponent(match[1]);
-    if(!store.story(id).cover)throw new HttpError(404,'This story has no illustrated cover.');
+    const story=store.story(id);
+    if(!story.cover)throw new HttpError(404,'This story has no illustrated cover.');
     if(match[2]==='image' && req.method==='GET'){
       const row=store.db.prepare('SELECT image FROM story_art WHERE id=?').get(id);
-      image(row?.image instanceof Uint8Array?Buffer.from(row.image):portrait(store));
+      if(row?.image instanceof Uint8Array)image(Buffer.from(row.image));
+      else if(story.cover.reference!==false)image(portrait(store));
+      else{
+        const symbols={book:'本',article:'文',dialogue:'言'};
+        const symbol=symbols[story.format?.type??'book'];
+        res.writeHead(200,{'Content-Type':'image/svg+xml','Cache-Control':'no-store'});
+        res.end('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><rect width="640" height="360" fill="#f3e8d7"/><circle cx="320" cy="180" r="85" fill="#ecdbca"/><text x="320" y="214" text-anchor="middle" font-size="96" fill="#875342">'+symbol+'</text></svg>');
+      }
     }else if(match[2]==='image' && req.method==='POST'){
       const bytes=await upload(req);
       store.db.prepare("INSERT OR REPLACE INTO story_art(id,status,image) VALUES(?,'imported',?)").run(id,bytes);

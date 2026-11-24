@@ -4,7 +4,7 @@ import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
 document.querySelector('.skip').onclick=event=>{event.preventDefault();root.focus();};
-for(const [name,mark] of [['Practice','book'],['Library','books'],['Settings','settings']]) {
+for(const [name,mark] of [['Practice','book'],['Library','books'],['Progression','flag'],['Settings','settings']]) {
   const a=link(name,'#/'+name.toLowerCase());
   a.prepend(icon(mark));nav.append(a);
 }

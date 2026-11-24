@@ -72,7 +72,7 @@ export function showCover(context,story,article) {
     retry.disabled=true;
     try{await api(base+'/retry',{});await refresh();}catch(error){report(error);}finally{retry.disabled=false;}
   };
-  tools.append(el('summary','Cover artwork'),copy,download,uploadButton('Import cover',base+'/image',refresh),retry,prompt);
+  tools.append(el('summary','Cover artwork'),copy,...(story.cover.reference===false?[]:[download]),uploadButton('Import cover',base+'/image',refresh),retry,prompt);
   const controls=el('div',null,'cover-reading-actions');
   controls.append(link('Start reading','#/read/'+encodeURIComponent(story.id),'button'),tools);
   root.append(image,article,controls,status);

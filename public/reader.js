@@ -57,14 +57,30 @@ export async function reader({root,parts,signal,onLeave}) {
   center.append(heading);
   const article=readingText(chapter.paragraphs);
   const paragraphs=Array.from(article.children);
+  const baby=story.format?.stage==='Baby book';
+  const unit=baby?'Page':chapter.speakers?'Message':'Paragraph';
+  if(baby)article.classList.add('baby-pages');
+  if(chapter.speakers)article.classList.add('message-thread');
+  let step=0;
   paragraphs.forEach((para,index)=>{
+    if(chapter.speakers){
+      const speaker=chapter.speakers[index];
+      para.classList.add(speaker===0?'outgoing':'incoming');
+      para.prepend(el('small',chapter.names[speaker]+(speaker===0?' · You':''),'message-author'));
+    }
+    const role=chapter.sections?.[index];
+    if(role){
+      para.classList.add('document-'+role);
+      if(role==='step')para.prepend(el('small','Step '+(++step),'document-label'));
+      if(role==='ingredients' && index===0)para.prepend(el('small','Ingredients','document-label'));
+    }
     para.after(translationToggle(chapter.translations?.[index],()=>api(endpoint+'/translation',
       {chapter:position.chapter,paragraph:index},signal),signal));
   });
   const controls=el('div',null,'reader-controls');
   const cursor=el('div',null,'paragraph-nav');
-  const prev=el('button','←');prev.setAttribute('aria-label','Previous paragraph');
-  const next=el('button','→');next.setAttribute('aria-label','Next paragraph');
+  const prev=el('button','←');prev.setAttribute('aria-label','Previous '+unit.toLowerCase());
+  const next=el('button','→');next.setAttribute('aria-label','Next '+unit.toLowerCase());
   const where=el('span');
   cursor.append(prev,where,next);controls.append(cursor);
   center.append(article,controls);
@@ -72,7 +88,9 @@ export async function reader({root,parts,signal,onLeave}) {
   const tracking=trackParagraph(()=>paragraphs.map(p=>p.getBoundingClientRect()),()=>window.innerHeight,p=>move(p,false));
   function showPosition(scroll) {
     paragraphs.forEach((p,i)=>p.classList.toggle('current-paragraph',i===position.paragraph));
-    where.textContent='Paragraph '+(position.paragraph+1)+' of '+chapter.paragraphs.length;
+    if(baby)center.classList.toggle('inside-baby-book',position.paragraph<paragraphs.length-1);
+    if(baby)paragraphs.forEach((p,i)=>{p.hidden=i!==position.paragraph;p.nextElementSibling.hidden=p.hidden;});
+    where.textContent=unit+' '+(position.paragraph+1)+' of '+chapter.paragraphs.length;
     prev.disabled=!position.paragraph;next.disabled=position.paragraph===chapter.paragraphs.length-1;
     if(scroll){
       tracking.programmatic();

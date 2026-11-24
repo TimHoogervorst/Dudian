@@ -18,8 +18,8 @@ test('a pending story stays available across requests and duplicate starts share
   await nextTurn();
   assert.equal(latestGeneration(store)?.stage,'writing');
   assert.equal(startGeneration(store,'hard',30)?.difficulty,'easy');
-  const words=[...plan.newWords,...(plan.compound?[plan.compound]:[]),...Array(plan.targetWords).fill(plan.background[0])];
-  finish(JSON.stringify({title:'Morning',chapters:[{title:'Tea',paragraphs:[[words.map(word=>word+':1')]]}]}));
+  const words=[...plan.newWords,...(plan.compound?[plan.compound]:[]),plan.background[0]];
+  finish(JSON.stringify({title:'Morning',chapters:[{title:'Tea',paragraphs:Array.from({length:4},()=>[words.map(word=>word+':1')])}]}));
   await nextTurn();
   const job=latestGeneration(store);
   assert.equal(job?.stage,'ready',String(job?.error));

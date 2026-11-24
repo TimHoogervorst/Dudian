@@ -1,3 +1,6 @@
+import {coverTemplate} from './cover-template.ts';
+import {articleSectionsValid,bookWithCast,formatRules} from './reading-format.ts';
+import {messages} from './reading-types.ts';
 import {planWordReviews,wordReviewCards} from './word-review.ts';
 import { randomUUID } from 'node:crypto';
 import { catalog } from './catalog.ts';
@@ -35,16 +38,14 @@ function promptFor(plan:StoryPlan,dictionary:Lexicon) {
   const glossary = [...dictionary].map(([word,senses]) =>
     word+' '+senses.map((s,i) => String(i+1)+'='+s.meaning).join(' | ')).join('\n');
   return [
-    'Write one coherent, engaging slice-of-life story for a learner of simplified Mandarin. Titles are short and in English.',
-    'The protagonist is always 包包 (Bāobāo), a little cream-colored steamed bun with a green satchel. Use 包包:1 as the cast name. Family members like 妈妈 and 爸爸 use ordinary glossary entries. No other named characters.',
-    ...(plan.subject?['Center the plot on the selected subject '+plan.subject.en+' ('+plan.subject.zh+'). Express it using the approved glossary and weave the focus words into the action.']:[]),
-    'At beginner level write a picture-book adventure with a concrete goal and visible outcome. As vocabulary grows, allow richer situations and motivations.',
+    'Write simplified Mandarin for a learner. Titles are short and in English.',formatRules(plan),
+    ...(plan.subject?['Focus the reading on the selected subject '+plan.subject.en+' ('+plan.subject.zh+'). Express it using the approved glossary and weave the focus words into the action.']:[]),
     'This learner has strong reading knowledge of '+(plan.strongCharacters??0)+' distinct Chinese characters.',
     'Include a teaser property: one or two short spoiler-free Chinese sentences, encoded as a flat array of the same FORM:NUMBER and punctuation tokens.',
     'Return only a JSON object with title, teaser and chapters. Each chapter has title, paragraphs and translations. translations is an array of natural English strings, exactly one full translation per paragraph in matching order. Preserve dialogue, names and meaning without adding explanations. Each paragraph is an array of sentences. Each sentence is an ordered array of strings.',
     'Each word token must be exactly FORM:NUMBER, using the glossary number for its contextual meaning. Send punctuation as separate strings. Example sentence ["我:1","喝:1","茶:1","。"].',
-    'Use only listed forms and the cast name 包包:1. Segment at natural word boundaries.',
-    'Write '+plan.chapterCount+' chapter(s) totaling approximately '+plan.targetWords+' word occurrences. Every chapter must have '+paragraphCounts[plan.difficulty].join(' to ')+' paragraphs. Aim for 40 segmented words per paragraph.',
+    'Use only listed forms'+(bookWithCast(plan)?' and the cast name 包包:1':'')+'. Segment at natural word boundaries.',
+    'Write exactly '+plan.chapterCount+' chapter(s).',
     'Use each teaching word at least once: '+[...plan.newWords,...(plan.compound?[plan.compound]:[])].join('、'),
     'Reuse each review word in at least two distinct sentences: '+plan.reviewWords.join('、'),
     'Allowed glossary with per-word sense numbers:',glossary
@@ -88,6 +89,9 @@ function chapterFrom(raw:any,index:number,dictionary:Lexicon): Chapter {
     throw new CandidateError('Provide one complete English translation per paragraph in the translations array, in matching order.',index);
   return {title:raw.title.trim(),paragraphs,translations:raw.translations.map((text:string)=>text.trim())};
 }
+function validSpeakerName(name:unknown){
+  return typeof name==='string' && name.trim()===name && name.length>0 && name.length<=30;
+}
 function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   if (!candidate || !title(candidate.title) || !Array.isArray(candidate.chapters) || candidate.chapters.length !== plan.chapterCount) {
     throw new CandidateError('Expected a title and exactly '+plan.chapterCount+' chapters.');
@@ -95,7 +99,24 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   const chapters:Chapter[] = candidate.chapters.map((raw:unknown,i:number) => chapterFrom(raw,i,dictionary));
   const [min,max]=paragraphCounts[plan.difficulty];
   for(const [i,chapter] of chapters.entries()){
-    if(chapter.paragraphs.length<min || chapter.paragraphs.length>max)
+    const format=plan.format, raw=candidate.chapters[i];
+    if(format?.type==='dialogue'){
+      const {names,speakers}=raw;
+      if(!Array.isArray(names)||names.length!==format.people||!names.every(validSpeakerName)||new Set(names).size!==names.length||
+        (i>0 && JSON.stringify(names)!==JSON.stringify(chapters[0].names)))
+        throw new CandidateError('Provide the planned distinct speaker names in the same order in every chapter.',i);
+      if(!Array.isArray(speakers)||speakers.length!==messages[plan.difficulty]||speakers.length!==chapter.paragraphs.length||
+        !speakers.every(n=>Number.isInteger(n)&&n>=0&&n<format.people)||new Set(speakers).size!==format.people)
+        throw new CandidateError('Provide exactly '+messages[plan.difficulty]+' messages and one speaker index per message, including each participant.',i);
+      chapter.names=names;chapter.speakers=speakers;
+    }else if(format?.type==='article'){
+      if(!articleSectionsValid(format.documents[i],raw.sections,chapter.paragraphs.length))
+        throw new CandidateError('Use the required section roles for '+format.documents[i]+', one per paragraph in document order.',i);
+      chapter.sections=raw.sections;
+    }else if(format?.stage==='Baby book'){
+      if(chapter.paragraphs.length<4||chapter.paragraphs.length>8||chapter.paragraphs.some(p=>p.some(t=>t.sentence!==0)||p.filter(t=>t.entry||t.cast).length>12))
+        throw new CandidateError('Supply 4 to 8 pages with one short sentence of at most 12 words per page.',i);
+    }else if(chapter.paragraphs.length<min || chapter.paragraphs.length>max)
       throw new CandidateError('Each '+plan.difficulty+' chapter requires '+min+' to '+max+' paragraphs.',i);
     if(chapter.paragraphs.some(tokens=>tokens.filter(t=>t.entry||t.cast).length>60))
       throw new CandidateError('Shorten each paragraph to at most 60 words.',i);
@@ -122,26 +143,28 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   const novel = new Set(plan.newCharacters);
   for (const char of words.join('')) if (!backgroundCharacters.has(char)) novel.add(char);
   if (novel.size>plan.ceiling) throw new CandidateError('The story exceeds the new-character ceiling.');
-  if (count < Math.floor(plan.targetWords*0.6) || count > Math.ceil(plan.targetWords*1.5)) {
+  const prose=!plan.format || (plan.format.type==='book' && plan.format.stage!=='Baby book');
+  if (prose && (count < Math.floor(plan.targetWords*0.6) || count > Math.ceil(plan.targetWords*1.5))) {
     const sizes=chapters.map(chapter=>chapter.paragraphs.flat().filter(token=>token.entry).length);
     const size=count<plan.targetWords ? Math.min(...sizes) : Math.max(...sizes);
     const revisedSize=Math.max(1,size+plan.targetWords-count);
     throw new CandidateError('The story contains '+count+' words; aim for approximately '+revisedSize+' words in the revised chapter.',sizes.indexOf(size));
   }
   const scene=chapters.flatMap(c=>c.paragraphs).find(tokens=>tokens.some(t=>t.cast));
-  if(!scene)throw new CandidateError('Name 包包:1 as the protagonist in the chapter text.',0);
+  if(scene&&!bookWithCast(plan))throw new CandidateError('Use ordinary vocabulary in this reading, without the cast name.',chapters.findIndex(c=>c.paragraphs.includes(scene)));
+  if(!scene&&(!plan.format||(plan.format.type==='book'&&plan.format.stage==='Children’s book')))throw new CandidateError('Name 包包:1 as the protagonist in the chapter text.',0);
   let teaser:string;
   let tokens:Token[];
   try{
     if(!Array.isArray(candidate.teaser)||candidate.teaser.length>90)throw Error();
     tokens=numberSentences(candidate.teaser.map((t:unknown)=>tokenFor(t,dictionary,0,0)));
+    if(!bookWithCast(plan)&&tokens.some(t=>t.cast))throw Error();
     teaser=tokens.map(t=>t.text).join('');
     if(!/^(?:[^。！？]+[。！？]){1,2}$/u.test(teaser))throw Error();
   }catch{throw new CandidateError('Supply a teaser of one or two complete sentences using approved FORM:NUMBER tokens and punctuation.');}
-  const prompt='Illustrate one scene from “'+candidate.title.trim()+'” as a warm children’s picture-book cover. '+
-    'Match 包包 in the supplied reference: cream pleated bun, rosy cheeks, tiny limbs and green crossbody satchel. '+
-    'Show the action and setting of this passage. Keep the character recognizable. No lettering.\n'+scene.map(t=>t.text).join('');
-  return {title:candidate.title.trim() as string,chapters,cover:{teaser,prompt,tokens}};
+  const titleText=candidate.title.trim() as string;
+  const artwork=coverTemplate({format:plan.format,title:titleText,chapters});
+  return {title:titleText,chapters,cover:{teaser,tokens,...artwork}};
 }
 
 function previewFor(plan:StoryPlan,chapters:Chapter[]) {
@@ -193,11 +216,11 @@ export async function generateStory(store:ReadingStore,plan:StoryPlan,write:Cand
         const {pinyin,meaning}=tokens.find(t=>t.entry===text)!;
         return {text,pinyin,meaning};
       });
-      const story={id:randomUUID(),difficulty:plan.difficulty,...accepted,
+      const story={id:randomUUID(),difficulty:plan.difficulty,format:plan.format,...accepted,
         preview:{...previewFor(plan,accepted.chapters),wordReview}};
       report('questions');
       for(const section of story.chapters){
-        section.questions=await generateQuestions(section,plan,[...dictionary.keys(),'包包'],write);
+        section.questions=await generateQuestions(section,plan,[...dictionary.keys(),...(section.paragraphs.some(p=>p.some(t=>t.cast))?['包包']:[]),...section.names??[]],write);
       }
       rounds.forEach(({chapter,words},i)=>story.chapters[chapter].questions!.push(...wordReviewCards(story.chapters,chapter,words,i+1)));
       report('saving');
@@ -217,7 +240,7 @@ export async function generateStory(store:ReadingStore,plan:StoryPlan,write:Cand
       if (chapter === undefined) {
         prompt = [instructions,feedback,'Supply a corrected complete story.'].join('\n');
       } else {
-        const scope = 'Revise only chapter '+(chapter+1)+'. Return only its JSON object with title, paragraphs and matching English translations. Keep valid sentences. Check EVERY token against the glossary. Rewrite any sentence containing an unlisted form using approved vocabulary, and use only a listed sense number. All other chapters will remain as written.';
+        const scope = 'Revise only chapter '+(chapter+1)+'. Return only its JSON object with title, paragraphs and matching English translations and all format-specific chapter fields. Keep valid sentences. Check EVERY token against the glossary. Rewrite any sentence containing an unlisted form using approved vocabulary, and use only a listed sense number. All other chapters will remain as written.';
         prompt = [instructions,feedback,scope,'Current draft:',JSON.stringify(candidate)].join('\n');
       }
     }

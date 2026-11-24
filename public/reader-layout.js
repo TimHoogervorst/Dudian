@@ -12,7 +12,7 @@ export function readerLayout(root,story,activeChapter,activeReview){
   contents.append(link('← Reading desk','#/home','text-link'),el('h2',story.title));
   const list=el('ol');
   if(story.cover){
-    const item=el('li'),cover=link('Cover','#/introduction/'+encodeURIComponent(id));
+    const item=el('li'),cover=link('Introduction','#/introduction/'+encodeURIComponent(id));
     cover.prepend(icon('book'));
     if(activeChapter===-1)cover.setAttribute('aria-current','page');
     item.append(cover);list.append(item);

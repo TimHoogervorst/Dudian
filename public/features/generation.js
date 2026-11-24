@@ -64,10 +64,10 @@ export function setup(ui) {
       {value:'reading',symbol:'book'}, {value:'speaking',symbol:'microphone',disabled:true},
       {value:'listening',symbol:'headphones',disabled:true},
     ]);
-    const storyType=choiceGroup('Type','storyType','picture-book',[
-      {value:'picture-book',label:'Children’s book',symbol:'book'},
-      {value:'news',label:'News article',symbol:'newspaper',disabled:true},
-      {value:'dialogue',label:'Dialogue',symbol:'conversation',disabled:true},
+    const storyType=choiceGroup('Type','storyType','book',[
+      {value:'book',label:'Book',symbol:'book'},
+      {value:'article',label:'Article',symbol:'newspaper'},
+      {value:'dialogue',label:'Dialogue',symbol:'conversation'},
     ]);
     const difficulty=choiceGroup('Difficulty','difficulty',preferences.difficulty,levels.map(value=>({value,symbol:value})));
     const duration=choiceGroup('Story length','minutes','10',[
@@ -108,18 +108,22 @@ export function setup(ui) {
       status.textContent='Updating character focus…';
       try{
         const next=await api('/api/practice-preview',{
-          minutes:Number(choices.get('minutes')),difficulty:choices.get('difficulty'),previewId:preview?.id,reroll,
+          type:choices.get('storyType'),minutes:Number(choices.get('minutes')),difficulty:choices.get('difficulty'),previewId:preview?.id,reroll,
         },signal);
         if(signal.aborted||request!==revision)return;
         if(next.subjects.some((item,i)=>preview?.subjects[i]?.zh!==item.zh)){
-          topics.replaceChildren(...next.subjects.map((item,i)=>{
+          topics.replaceChildren(...[{zh:'open',en:'Any subject'},...next.subjects].map((item,i)=>{
             const label=el('label',null,'choice-card subject-card');
             const input=el('input');
             input.type='radio';input.name='subject';input.value=item.zh;input.checked=i===0;
-            const zh=el('strong',item.zh);zh.lang='zh-Hans';
+            const zh=el('strong',item.zh==='open'?'不限':item.zh);zh.lang='zh-Hans';
             label.append(input,zh,el('span',item.en));
             return label;
           }));
+        }
+        const hints={book:next.options.stage,article:'Various',dialogue:next.options.people+' people'};
+        for(const input of storyType.querySelectorAll('input')){
+          input.parentElement.querySelector('small').textContent=hints[input.value];
         }
         preview=next;
         progress.replaceChildren(readingProgress(next.level,next.projected));
@@ -178,7 +182,7 @@ export function setup(ui) {
       markCompleted(root,completion.chapters);
       content=center;
       const heading=el('header',null,'chapter-heading');
-      heading.append(el('p','Story cover','overline'),el('h1',story.title));
+      heading.append(el('p','Introduction','overline'),el('h1',story.title));
       center.append(heading);
       const article=readingText([story.cover.tokens]);
       showCover({...context,root:center},story,article);
@@ -223,7 +227,9 @@ function choiceGroup(legend,name,selected,options) {
     input.disabled=disabled;
     const check=el('span','✓','choice-check');
     check.setAttribute('aria-hidden','true');
-    card.append(input,icon(symbol),el('span',label),check);
+    const caption=el('span',label);
+    if(name==='storyType')caption.append(el('small',null,'reading-subtype'));
+    card.append(input,icon(symbol),caption,check);
     cards.append(card);
   }
   group.append(el('legend',legend),cards);

@@ -1,3 +1,4 @@
+import {articleDocuments,readingOptions,type ReadingType} from './reading-types.ts';
 import {randomUUID} from 'node:crypto';
 import {encounterFor,perfectScore} from './encounters.ts';
 import {catalog,entryKind} from './catalog.ts';
@@ -9,7 +10,7 @@ import {HttpError,type ReadingStore} from './store.ts';
 import {suggestSubjects,type Subject} from './practice-subjects.ts';
 
 type Focus={word:string;role:'new'|'review'|'compound';characters:string[]};
-type Draft={plan:StoryPlan;focus:Focus[];excluded:string[];subjects:Subject[]};
+type Draft={options:ReturnType<typeof readingOptions>;plan:StoryPlan;focus:Focus[];excluded:string[];subjects:Subject[]};
 const lastSubjects=new WeakMap<ReadingStore,Subject[]>();
 const drafts=new WeakMap<ReadingStore,Map<string,Draft>>();
 function draftFor(store:ReadingStore,id:string){
@@ -21,6 +22,7 @@ function draftFor(store:ReadingStore,id:string){
 export function confirmedPlan(store:ReadingStore,id:string,difficulty:Difficulty,minutes:StoryLength,subjectId?:string){
   const {plan,subjects}=draftFor(store,id);
   if(plan.difficulty!==difficulty || plan.minutes!==minutes)throw new HttpError(409,'The selection changed. Refresh the practice preview.');
+  if(subjectId==='open')return {...plan,subject:undefined};
   const subject=subjectId===undefined?subjects[0]:subjects.find(item=>item.zh===subjectId);
   if(!subject)throw new HttpError(400,'Choose a subject from this preview.');
   return {...plan,subject};
@@ -39,7 +41,7 @@ function backgroundTarget(store:ReadingStore,plan:StoryPlan,excluded:Set<string>
   if(word)return {word,role:'review',characters:[]};
 }
 
-export function practicePreview(store:ReadingStore,options:{difficulty:Difficulty;minutes:StoryLength;previewId?:string;reroll?:string}){
+export function practicePreview(store:ReadingStore,options:{difficulty:Difficulty;minutes:StoryLength;previewId?:string;reroll?:string;type?:ReadingType}){
   const {difficulty,minutes,previewId,reroll}=options;
   if(!difficulties.includes(difficulty)||!validLength(minutes))throw new HttpError(400,'Choose a story length and difficulty.');
   const previous=previewId?draftFor(store,previewId):undefined;
@@ -103,6 +105,12 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
   const level=hskReadingProgress(store.db);
   const subjects=previous?.subjects??suggestSubjects(level,focus.flatMap(item=>[item.word,...item.characters]),lastSubjects.get(store)??[]);
   if(!previous)lastSubjects.set(store,subjects);
-  cache.set(id,{plan,focus,subjects,excluded:[...excluded]});drafts.set(store,cache);
-  return {id,cards,subjects,level,projected:hskReadingProgress(store.db,projected)};
+  const optionsForType=readingOptions(level,previous?.options.people);
+  const type=options.type??previous?.plan.format?.type??'book';
+  if(type==='book')plan.format={type,stage:optionsForType.stage};
+  else if(type==='article')plan.format={type,documents:articleDocuments(level,plan.chapterCount)};
+  else if(type==='dialogue')plan.format={type,people:optionsForType.people};
+  else throw new HttpError(400,'Unknown reading type.');
+  cache.set(id,{options:optionsForType,plan,focus,subjects,excluded:[...excluded]});drafts.set(store,cache);
+  return {id,options:optionsForType,cards,subjects,level,projected:hskReadingProgress(store.db,projected)};
 }

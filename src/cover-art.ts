@@ -46,12 +46,20 @@ export function portrait(store:ReadingStore) {
   const row=store.db.prepare('SELECT portrait FROM art_settings WHERE id=1').get();
   return row?.portrait instanceof Uint8Array?Buffer.from(row.portrait):readFileSync(new URL('../public/baobao.png',import.meta.url));
 }
-async function paidCover(key:string,model:string,prompt:string,bytes:Buffer,request:typeof fetch){
-  const type=imageType(bytes);
-  const form=new FormData();
-  form.set('model',model);form.set('prompt',prompt);
-  form.set('image[]',new Blob([new Uint8Array(bytes)],{type}),'baobao.'+type.split('/')[1]);
-  const response=await request('https://api.openai.com/v1/images/edits',{method:'POST',headers:{Authorization:'Bearer '+key},body:form,signal:AbortSignal.timeout(300000)});
+async function paidCover(key:string,model:string,prompt:string,bytes:Buffer|undefined,request:typeof fetch){
+  const headers:Record<string,string>={Authorization:'Bearer '+key};
+  let body:FormData|string;
+  if(bytes){
+    const type=imageType(bytes);
+    const form=new FormData();
+    form.set('model',model);form.set('prompt',prompt);
+    form.set('image[]',new Blob([new Uint8Array(bytes)],{type}),'baobao.'+type.split('/')[1]);
+    body=form;
+  }else{
+    headers['Content-Type']='application/json';
+    body=JSON.stringify({model,prompt});
+  }
+  const response=await request('https://api.openai.com/v1/images/'+(bytes?'edits':'generations'),{method:'POST',headers,body,signal:AbortSignal.timeout(300000)});
   if(!response.ok)throw Error('Image API returned HTTP '+response.status+'. Check the image key and API billing, then retry.');
   const result=await response.json();
   return Buffer.from(result.data?.[0]?.b64_json??'','base64');
@@ -67,7 +75,7 @@ export function queueArtwork(store:ReadingStore,id:string,request=fetch,subscrip
   const key=String(store.db.prepare('SELECT key FROM art_settings WHERE id=1').get()!.key);
   setImmediate(async()=>{
     try{
-      const bytes=portrait(store);
+      const bytes=cover.reference===false?undefined:portrait(store);
       const image=settings.provider==='subscription'?await subscription(cover.prompt,bytes,settings.codexModel):await paidCover(key,settings.apiModel,cover.prompt,bytes,request);
       imageType(image);
       store.db.prepare("UPDATE story_art SET image=?,status='ready' WHERE id=? AND status='drawing'").run(image,id);
