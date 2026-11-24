@@ -13,7 +13,7 @@ export interface ChapterQuestion {
   word:string; sense:string|number; characters:string[];
 }
 export interface PreviewItem {text:string;pinyin?:string;meaning?:string;example?:string}
-export interface Story { format?:import('./reading-types.ts').ReadingFormat; id: string; title: string; difficulty?:Difficulty; preview?:{wordReview?:PreviewItem[];characters:PreviewItem[];reviewCharacters?:string[]; words?:PreviewItem[];review:PreviewItem[];compound?:PreviewItem}; cover?:{reference?:boolean;teaser:string;prompt:string;tokens?:Token[]}; chapters: { speakers?:number[];names?:string[];sections?:string[]; title: string; paragraphs: Token[][]; translations?:(string|null)[]; questions?:ChapterQuestion[] }[] }
+export interface Story { format?:import('./reading-types.ts').ReadingFormat; id: string; title: string; difficulty?:Difficulty; preview?:{wordReview?:PreviewItem[];characters:PreviewItem[];reviewCharacters?:string[]; words?:PreviewItem[];review:PreviewItem[];compound?:PreviewItem}; cover?:{reference?:boolean;teaser:string;prompt:string;tokens?:Token[]}; chapters: { focus?:string[]; speakers?:number[];names?:string[];sections?:string[]; title: string; paragraphs: Token[][]; translations?:(string|null)[]; questions?:ChapterQuestion[] }[] }
 export interface Position { chapter: number; paragraph: number }
 export class HttpError extends Error {
   status: number;

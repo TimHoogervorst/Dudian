@@ -1,5 +1,6 @@
 import { vocabularyFor } from './vocabulary-plan.ts';
 import { HttpError, type ReadingStore } from './store.ts';
+import {lengthBudget,storyDifficulty} from './story-difficulty.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
 export type Difficulty = typeof difficulties[number];
@@ -27,6 +28,17 @@ export interface StoryPlan {
   compound?: string;
 }
 
+export function chapterFocus(plan:StoryPlan){
+  const words=[...new Set([...plan.reviewWords,...(plan.compound?[plan.compound]:[]),...plan.newWords])];
+  const count=plan.chapterCount;
+  // For twelve targets and five chapters this yields 1–4, 3–6, 5–8, 7–10, 9–12.
+  const width=count===1?words.length:Math.min(words.length,Math.max(2,Math.ceil((words.length-2)/count)+2));
+  return Array.from({length:count},(_,chapter)=>{
+    const start=count===1?0:Math.round(chapter*(words.length-width)/(count-1));
+    return words.slice(start,start+width);
+  });
+}
+
 function ensurePreferences(store: ReadingStore) {
   store.db.exec('CREATE TABLE IF NOT EXISTS story_preferences (learner INTEGER PRIMARY KEY REFERENCES learners(id), preferences TEXT NOT NULL)');
 }
@@ -49,9 +61,10 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
 
 export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: StoryLength,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
   if (!difficulties.includes(difficulty) || !validLength(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
-  const ceiling = getPreferences(store).ceilings[difficulty];
   const chapterCount=chapterCounts[minutes];
+  const ceiling=lengthBudget(getPreferences(store).ceilings[difficulty],chapterCount);
+  const focusLimit=lengthBudget(storyDifficulty[difficulty].focusCards,chapterCount);
   const [min,max]=paragraphCounts[difficulty];
   return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40,
-    ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded)};
+    ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
 }

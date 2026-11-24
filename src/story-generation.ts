@@ -5,7 +5,7 @@ import {planWordReviews,wordReviewCards} from './word-review.ts';
 import { randomUUID } from 'node:crypto';
 import { catalog } from './catalog.ts';
 import { type ReadingStore, type Story, type Token } from './store.ts';
-import { paragraphCounts, type StoryPlan } from './story-plan.ts';
+import { chapterFocus, paragraphCounts, type StoryPlan } from './story-plan.ts';
 import { generateText } from './provider.ts';
 import {generateQuestions} from './quiz-generation.ts';
 import {isTranslation} from './paragraph-translation.ts';
@@ -47,6 +47,8 @@ function promptFor(plan:StoryPlan,dictionary:Lexicon) {
     'Use only listed forms'+(bookWithCast(plan)?' and the cast name 包包:1':'')+'. Segment at natural word boundaries.',
     'Write exactly '+plan.chapterCount+' chapter(s).',
     'Use each teaching word at least once: '+[...plan.newWords,...(plan.compound?[plan.compound]:[])].join('、'),
+    ...(plan.chapterCount>1?['Introduce and revisit focus words according to the chapter schedule. Build each scene around its assigned words. Avoid front-loading later targets.',
+      ...chapterFocus(plan).map((words,i)=>'Chapter '+(i+1)+' focus (use each exact segmented word): '+words.join('、'))]:[]),
     'Reuse each review word in at least two distinct sentences: '+plan.reviewWords.join('、'),
     'Allowed glossary with per-word sense numbers:',glossary
   ].join('\n');
@@ -98,6 +100,7 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   }
   const chapters:Chapter[] = candidate.chapters.map((raw:unknown,i:number) => chapterFrom(raw,i,dictionary));
   const [min,max]=paragraphCounts[plan.difficulty];
+  const schedule=chapterFocus(plan);
   for(const [i,chapter] of chapters.entries()){
     const format=plan.format, raw=candidate.chapters[i];
     if(format?.type==='dialogue'){
@@ -120,6 +123,13 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
       throw new CandidateError('Each '+plan.difficulty+' chapter requires '+min+' to '+max+' paragraphs.',i);
     if(chapter.paragraphs.some(tokens=>tokens.filter(t=>t.entry||t.cast).length>60))
       throw new CandidateError('Shorten each paragraph to at most 60 words.',i);
+    if(plan.chapterCount>1){
+      const assigned=schedule[i];
+      const present=new Set(chapter.paragraphs.flat().map(token=>token.entry));
+      const missing=assigned.filter(word=>!present.has(word));
+      if(missing.length)throw new CandidateError('Include the assigned focus words in chapter '+(i+1)+': '+missing.join('、'),i);
+      chapter.focus=[...new Set([...assigned,...[...plan.newCharacters,...plan.reviewCharacters??[]].filter(c=>assigned.some(word=>word.includes(c)))])];
+    }
   }
   const sentencesByWord = new Map<string,Set<string>>();
   let count = 0;

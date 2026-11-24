@@ -18,8 +18,9 @@ export function questionCharacters(q:ChapterQuestion){
   return new Set(words.join('').match(/\p{Script=Han}/gu)??[]);
 }
 
-export function storyFocus(story:Story){
-  const strong=focusItems(story);
+export function storyFocus(story:Story,chapter?:number){
+  const assigned=chapter===undefined?undefined:story.chapters[chapter]?.focus;
+  const strong=assigned?new Set(assigned):focusItems(story);
   const medium=new Set(story.preview?.wordReview?.map(item=>item.text));
   const soft=new Set<string>();
   for(const chapter of story.chapters)for(const q of chapter.questions??[]){
@@ -44,7 +45,7 @@ export function recordStoryPoints(db:DatabaseSync,id:string,chapter:number,text:
 export function recordAnswer(db:DatabaseSync,story:Story,chapter:number,index:number,correct:boolean,english:boolean,now:number){
   const questions=story.chapters[chapter].questions!;
   const q=questions[index];
-  const tier=storyFocus(story);
+  const tier=storyFocus(story,chapter);
   const full=storyDifficulty[story.difficulty??'easy'].points;
   const evidence=correct?(english?'assisted':'correct'):'incorrect';
   const tested=new Set([q.word,...q.characters]);

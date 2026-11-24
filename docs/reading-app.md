@@ -17,9 +17,11 @@ The progression for Book, Article, and Dialogue is described in [Reading types a
 
 ### Story targets
 
-Easy allows up to two distinct new characters, Medium up to three, and Hard up to five across the whole story. Settings stores the learner’s preferred difficulty and editable ceilings. Choosing a different difficulty for a session overrides the default for that story.
+A short story defaults to two new characters on Easy, three on Medium, and five on Hard. Each additional chapter adds up to two slots, with length-based growth stopping at twelve. A short-story ceiling of one adds one slot per chapter and zero keeps all lengths review-only. Settings stores the learner’s preferred difficulty and short-story ceilings.
 
 HSK 1 words are available as background vocabulary from day one. The first story can select characters from this pool to teach deliberately. Other background characters remain unseen until encountered. Later stories can introduce characters from the next level as explicit targets.
+
+The unseen-character boost uses the Library’s Unseen characters in the next unpassed HSK level. From 90% of the way to that level, a long Hard story reserves up to three initial review cards and prioritizes those characters. The boost ends when the level’s Unseen list is empty. Ordinary review and introduction rules fill the remaining slots. After a pass, the same thresholds apply to progress through the next level.
 
 A story may introduce one additional unfamiliar compound made entirely from familiar characters. Preview it as a whole word. Give each story an explicit review goal when prior practice is available. Show “New this story” with pronunciation, meaning, and a word containing each target character. Show “Practice again” for review items and reuse them in different sentences. Viewing the introduction earns no reading credit.
 
@@ -31,7 +33,9 @@ Each word occurrence identifies a dictionary entry and the sense intended in tha
 
 When validation fails, return specific errors and request a revision of the affected chapter. Allow up to two automatic correction attempts across the story and revalidate the complete story after each. If validation still fails, offer a manual retry. Generation and retries leave learner scores untouched.
 
-Estimate short and long story lengths provisionally at first. After several completed chapters, use the learner’s active reading time, including definition checks, to adjust future lengths. Difficulty controls the vocabulary budget independently.
+Multi-chapter stories distribute focus words across overlapping groups. With twelve focus words, five chapters cover words 1–4, 3–6, 5–8, 7–10 and 9–12. Each assigned word must appear in its chapter. The preview estimates points from those appearances. When eligible introductions leave slots open, longer stories fill them with additional review or background vocabulary.
+
+Estimate short and long story lengths provisionally at first. After several completed chapters, use the learner’s active reading time, including definition checks, to adjust future lengths.
 
 ### Library and review
 

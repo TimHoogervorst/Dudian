@@ -4,7 +4,7 @@
 
 Library Practice changes reading strength by +0.5 for a correct answer and −0.5 for a miss, within the existing score limits. Each matching pair is scored separately. The same half-point rule applies when the item is overdue, and either answer settles its review.
 
-The planner selects up to two focus cards on Easy, three on Medium and six on Hard. The story cover presents one Character focus list, ordered by priority. Each character or whole word uses its highest applicable tier.
+For short stories the planner selects up to two focus cards on Easy, three on Medium and six on Hard. Longer stories add up to two focus slots per additional chapter, up to twelve. The story cover presents the combined Character focus list. Within each chapter, assigned focus words and their target characters receive the strong focus tier.
 
 | Story tier | Easy | Medium | Hard |
 |---|---:|---:|---:|

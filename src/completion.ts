@@ -35,7 +35,7 @@ export function finishChapter(store:ReadingStore,storyId:string,chapter:number,n
     if(Number(answered?.total)<questions.length)throw new HttpError(409,'Answer the chapter questions first.');
     const first=db.prepare('INSERT OR IGNORE INTO chapter_completions VALUES(?,?,?,?)').run(storyId,chapter,now,words.length);
     if(first.changes) {
-      const tier=storyFocus(story);
+      const tier=storyFocus(story,chapter);
       const full=storyDifficulty[story.difficulty??'easy'].points;
       const aided=db.prepare('SELECT DISTINCT word FROM word_actions WHERE story_id=? AND chapter=?').all(storyId,chapter);
       const blocked=readingItems(aided.map(row=>String(row.word)));

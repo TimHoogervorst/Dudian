@@ -28,7 +28,7 @@ export function setup(ui) {
     const form=el('form',null,'story-settings');
     form.append(el('h2','Story difficulty'));
     const difficulty=difficultySelect(ui,preferences.difficulty);
-    form.append(field(ui,'Default difficulty',difficulty),el('p','Maximum new characters in a story'));
+    form.append(field(ui,'Default difficulty',difficulty),el('p','Maximum new characters in a short story. Longer stories allow up to two more per additional chapter, up to twelve. Zero keeps all lengths review-only.'));
     const inputs={};
     for (const level of levels) {
       const input=el('input');

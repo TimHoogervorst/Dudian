@@ -8,6 +8,13 @@ export function setup(ui) {
     const level=story.hskLevel?'HSK '+story.hskLevel:null;
     return el('span',[level,difficulty?difficulty[0].toUpperCase()+difficulty.slice(1):'Difficulty unrecorded'].filter(Boolean).join(' · '),'story-metadata');
   }
+  function statusBadge(story){
+    const state=story.finished?'finished':story.opened?'reading':'new';
+    const badge=el('span',{finished:'Finished',reading:'In progress',new:'Not started'}[state],'gallery-status '+state);
+    const symbol=el('span',state==='finished'?'✓':'','gallery-status-icon');
+    symbol.setAttribute('aria-hidden','true');badge.prepend(symbol);
+    return badge;
+  }
   function listing(stories,manage=false) {
     const list=el('ul',null,'story-shelf');
     for(const story of stories) {
@@ -23,11 +30,7 @@ export function setup(ui) {
         if(!art)cover.src='/baobao.png';
         cover.setAttribute('aria-hidden','true');
         const title=el('h2');title.append(link(story.title,href,'gallery-story-link'));
-        const state=story.finished?'finished':story.opened?'reading':'new';
-        const badge=el('span',{finished:'Finished',reading:'In progress',new:'Not started'}[state],'gallery-status '+state);
-        const symbol=el('span',state==='finished'?'✓':'','gallery-status-icon');
-        symbol.setAttribute('aria-hidden','true');badge.prepend(symbol);
-        item.append(cover,title,badge,metadata(story));
+        item.append(cover,title,statusBadge(story),metadata(story));
         const menu=el('details',null,'story-menu');
         menu.name='story-actions';
         const toggle=el('summary','•••');
@@ -51,7 +54,7 @@ export function setup(ui) {
         if(art)a.append(art);
         else {const image=el('img',null,'shelf-art');image.src='/baobao.png';image.alt='';a.append(image);}
         const copy=el('span',null,'shelf-copy');
-        copy.append(el('strong',story.title),metadata(story),el('span',story.finished?'Finished':story.opened?'In progress':'Not started','story-state'));
+        copy.append(el('strong',story.title),metadata(story),statusBadge(story));
         a.append(copy);
         item.append(a);
       }
@@ -120,7 +123,7 @@ export function setup(ui) {
       copy.append(el('p','Chapter '+(featured.chapter+1)+' of '+featured.chapterCount,'overline'));
       const titles=el('div');
       titles.append(el('h2',featured.title),el('p',featured.chapterTitle,'hero-chapter'));
-      copy.append(titles,metadata(featured),link('Continue reading →',read(featured),'button'));
+      copy.append(titles,metadata(featured),statusBadge(featured),link('Continue reading →',read(featured),'button'));
     }else{
       copy.append(el('h2','Your next story'),link('Create a story →','#/practice','button'));
     }

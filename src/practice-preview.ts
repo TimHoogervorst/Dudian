@@ -2,8 +2,8 @@ import {articleDocuments,readingOptions,type ReadingType} from './reading-types.
 import {randomUUID} from 'node:crypto';
 import {encounterFor,perfectScore} from './encounters.ts';
 import {catalog,entryKind} from './catalog.ts';
-import {buildPlan,chapterCounts,difficulties,validLength,type Difficulty,type StoryLength,type StoryPlan} from './story-plan.ts';
-import {storyDifficulty} from './story-difficulty.ts';
+import {buildPlan,chapterFocus,difficulties,validLength,type Difficulty,type StoryLength,type StoryPlan} from './story-plan.ts';
+import {lengthBudget,storyDifficulty} from './story-difficulty.ts';
 import {strengthFor,hskReadingProgress} from './strength.ts';
 import {milestoneProgress} from './milestone-progress.ts';
 import {HttpError,type ReadingStore} from './store.ts';
@@ -49,9 +49,8 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
   let plan:StoryPlan;
   let focus:Focus[];
   const excluded=new Set(previous?.plan.difficulty===difficulty?previous.excluded:[]);
-  if(previous && previous.plan.difficulty===difficulty){
-    const chapterCount=chapterCounts[minutes];
-    plan={...previous.plan,minutes,chapterCount,targetWords:previous.plan.targetWords/previous.plan.chapterCount*chapterCount};
+  if(previous && previous.plan.difficulty===difficulty && previous.plan.minutes===minutes){
+    plan={...previous.plan};
     focus=[...previous.focus];
     if(reroll!==undefined){
       const i=focus.findIndex(item=>item.word===reroll);
@@ -68,10 +67,14 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
       for(const c of old.characters)excluded.add(c);
     }
   }else{
-    plan=buildPlan(store,difficulty,minutes);
-    focus=targets(plan).slice(0,storyDifficulty[difficulty].focusCards);
+    plan=buildPlan(store,difficulty,minutes,Date.now(),excluded);
+    focus=targets(plan).slice(0,lengthBudget(storyDifficulty[difficulty].focusCards,plan.chapterCount));
+    if(previous?.plan.difficulty===difficulty){
+      const priorOrder=new Map(previous.focus.map((item,i)=>[item.word,i]));
+      focus.sort((a,b)=>(priorOrder.get(a.word)??Infinity)-(priorOrder.get(b.word)??Infinity));
+    }
     while(focus.length<2){
-      const extra=backgroundTarget(store,plan,new Set(focus.map(item=>item.word)));
+      const extra=backgroundTarget(store,plan,new Set([...excluded,...focus.map(item=>item.word)]));
       if(!extra)break;
       focus.push(extra);
     }
@@ -79,13 +82,15 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
   const words=(role:Focus['role'])=>focus.filter(item=>item.role===role).map(item=>item.word);
   const characters=(role:Focus['role'])=>[...new Set(focus.filter(item=>item.role===role).flatMap(item=>item.characters))];
   plan={...plan,newWords:words('new'),newCharacters:characters('new'),reviewWords:words('review'),reviewCharacters:characters('review'),compound:words('compound')[0]};
+  const schedule=chapterFocus(plan);
   const projected=new Map<string,number>();
   function estimate(text:string){
     const kind=entryKind('word',text);
     const {color,score}=strengthFor(store.db,kind,text);
     const before=score??0;
     const due=encounterFor(store.db,text).dueAt;
-    const after=due!==null && due<=Date.now()?before:Math.min(perfectScore,before+storyDifficulty[difficulty].points*plan.chapterCount);
+    const chapters=schedule.filter(group=>group.some(word=>word===text||(kind==='character'&&word.includes(text)))).length;
+    const after=due!==null && due<=Date.now()?before:Math.min(perfectScore,before+storyDifficulty[difficulty].points*chapters);
     projected.set(text,after);
     const sense=catalog.get(kind,text)?.senses[0];
     return {text,kind,color,gain:Math.round((after-before)*1000)/1000,pinyin:sense?.pinyin,meaning:sense?.meaning};
