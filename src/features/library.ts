@@ -2,6 +2,7 @@ import type { Context } from '../server.ts';
 import { HttpError } from '../store.ts';
 import { catalog, entryKind,type CatalogItem, type Sense } from '../catalog.ts';
 import { setStrength,statusScores,strengthFor } from '../strength.ts';
+import {encounterFor} from '../encounters.ts';
 
 function plainPinyin(text: string) {
   return text.toLowerCase().replace(/u:|v/g,'ü').normalize('NFD')
@@ -17,7 +18,8 @@ export default async function library({req,url,store,json,body}: Context) {
     if(!text || !catalog.get(kind,text))throw new HttpError(404,'Dictionary entry unavailable.');
     const color=(await body())?.color;
     if(typeof color!=='string'||!Object.hasOwn(statusScores,color))throw new HttpError(400,'Choose a reading status.');
-    json(200,setStrength(store.db,kind,text,color as keyof typeof statusScores));
+    const strength=setStrength(store.db,kind,text,color as keyof typeof statusScores);
+    json(200,{...strength,lastSeen:encounterFor(store.db,text).lastSeen});
     return true;
   }
   if (text !== null) {
@@ -27,7 +29,7 @@ export default async function library({req,url,store,json,body}: Context) {
       const firstSense = catalog.get('word',word.text)?.senses[0];
       return {...word,meaning:firstSense?.meaning,sense:firstSense?.id};
     });
-    json(200,{...item,examples,...strengthFor(store.db,kind,text)});
+    json(200,{...item,examples,...strengthFor(store.db,kind,text),lastSeen:encounterFor(store.db,text).lastSeen});
     return true;
   }
 

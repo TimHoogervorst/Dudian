@@ -31,13 +31,15 @@ test('marked words remain available as background, then become deliberate review
   for (const word of ['茶','我','朋友']) {
     recordAction(store,{storyId:'tea-shop',chapter:0,paragraph:0,token:text.findIndex(t=>t.text===word),id:word,kind:'difficulty'},at);
   }
+  finishChapter(store,'tea-shop',0,at);
+  finishChapter(store,'tea-shop',1,at);
   const soon = buildPlan(store,'medium',10,at+day-1);
   assert(soon.background.includes('茶'));
   assert(![...soon.newWords,...soon.reviewWords].includes('茶'));
   const due = buildPlan(store,'hard',30,at+day);
   assert.deepEqual([...due.reviewWords].sort(),['我','茶','朋友'].sort());
-  assert.equal(due.newCharacters.length,0);
-  const sentence=due.reviewWords.map(word=>word+':1');
+  assert.equal(due.newCharacters.length,3);
+  const sentence=[...due.reviewWords,...due.newWords].map(word=>word+':1');
   const story=await generateStory(store,{...due,chapterCount:1,targetWords:30},withChapterQuestions(async prompt=>JSON.stringify({
     title:'Reunion',chapters:[{title:'Tea',paragraphs:[[[...sentence,...[...prompt.matchAll(/segmented word by the end of chapter 1: (.+)\./g)].flatMap(m=>m[1].split(', ').map(w=>w+':1')),'。']],[[...sentence,'。']],[[...sentence,'。']]]}],
   }),3));

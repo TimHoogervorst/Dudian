@@ -1,6 +1,52 @@
 import {summaryHeading} from '../summary-heading.js';
 import {startWordReview} from './flashcards.js';
 import {icon} from '../icons.js';
+import {el} from '../ui.js';
+
+function storyTags(result,signal){
+  const row=el('div',null,'summary-tags');
+  const level=result.difficulty;
+  const label=level[0].toUpperCase()+level.slice(1);
+  const tags=[{label,detail:result.award
+    ?result.focusPoints+' base points per focus item per eligible chapter ('+result.focusRate+'× the Medium rate).'
+    :label+' story difficulty.'}];
+  if(result.award){
+    const {base,multiplier,penalties,awarded,incorrect}=result.award;
+    const points=new Intl.NumberFormat(undefined,{maximumFractionDigits:3});
+    const flawless=multiplier===1.2;
+    const outcome=flawless?'Flawless':incorrect?incorrect+(incorrect===1?' mistake':' mistakes'):'Ungraded';
+    const reason=flawless?'Every answer correct. +20% to base points.':
+      incorrect?'Answer accuracy applies a '+multiplier+'× multiplier.':'No graded questions. Base points count at 1×.';
+    const calculation=points.format(base)+' × '+multiplier+(penalties?' − '+points.format(penalties)+' in penalties':'');
+    const limited=Math.abs(base*multiplier-penalties-awarded)>0.0005;
+    tags.push({label:outcome,flawless,detail:reason+' '+calculation+' → '+points.format(awarded)+' net points'+(limited?' after item score limits':'')+'.'});
+  }
+  let active;
+  function close(){
+    if(!active)return;
+    active.tip.hidden=true;
+    active=null;
+  }
+  for(const [index,tag] of tags.entries()){
+    const button=el('button',tag.label,'summary-tag'+(tag.flawless?' summary-tag-gold':''));
+    button.type='button';
+    const tip=el('span',tag.detail,'summary-tag-tip');
+    tip.id='story-tag-tip-'+index;
+    tip.setAttribute('role','tooltip');
+    tip.hidden=true;
+    button.setAttribute('aria-describedby',tip.id);
+    function show(){close();tip.hidden=false;active={button,tip};}
+    button.onpointerenter=e=>{if(e.pointerType==='mouse')show();};
+    button.onfocus=show;
+    button.onclick=show;
+    button.onblur=()=>{if(active?.button===button)close();};
+    row.append(button,tip);
+  }
+  row.onpointerleave=e=>{if(e.pointerType==='mouse' && document.activeElement!==active?.button)close();};
+  document.addEventListener('pointerdown',e=>{if(!row.contains(e.target))close();},{signal});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close();},{signal});
+  return row;
+}
 export function setup(ui) {
   const {el,api,link}=ui;
   ui.route('summary',async({root,parts,signal})=>{
@@ -11,7 +57,7 @@ export function setup(ui) {
     const metrics=[[result.chapters,result.chapters===1?'Chapter read':'Chapters read'],[result.distinctWords,'Distinct words']];
     if(result.quiz)metrics.push([result.quiz.correct+'/'+result.quiz.total,'Questions correct']);
     if(result.wordReview)metrics.push([result.wordReview.correct+'/'+result.wordReview.total,'Word cards correct']);
-    root.append(summaryHeading('Story complete',result.title,metrics));
+    root.append(summaryHeading('Story complete',result.title,metrics,storyTags(result,signal)));
     const gains=el('section',null,'summary-panel');
     const gainHeading=el('div',null,'summary-section-heading');
     const total=result.characterGains.highlights.length+result.characterGains.otherCount;

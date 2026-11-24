@@ -10,10 +10,10 @@ import {buildPlan} from '../src/story-plan.ts';
 
 test('saved difficulty rewards focused reading and unaided quiz answers once',t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
-  for(const [difficulty,points] of [['easy',1],['medium',2],['hard',3]] as const){
+  for(const [difficulty,points] of [['easy',1.5],['medium',2],['hard',2.5]] as const){
     const text={zh:'茶',en:'Tea'};
-    const q={prompt:text,choices:[text],correct:0,paragraph:0,token:0,word:'茶',sense:'1',characters:[]};
-    store.saveStory({id:difficulty,title:'Tea',difficulty,preview:{characters:[{text:'朋'}],review:[{text:'朋友'}]},
+    const q={prompt:{zh:'茶水',en:'Tea or water?'},choices:[text],correct:0,paragraph:0,token:0,word:'茶',sense:'1',characters:[]};
+    store.saveStory({id:difficulty,title:'Tea',difficulty,preview:{characters:[{text:'朋'},{text:'茶'}],review:[{text:'朋友'}]},
       chapters:[{title:'Tea',questions:[q],paragraphs:[['茶','朋友','水'].map(text=>({text,sentence:0}))]}]});
     const items=['茶','朋友','朋','水'];
     const scores=()=>items.map(word=>strengthFor(store.db,'word',word).score??0);
@@ -21,7 +21,8 @@ test('saved difficulty rewards focused reading and unaided quiz answers once',t=
     const input={action:'answer',question:0,choice:0};
     updateCheck(store,difficulty,0,input);
     updateCheck(store,difficulty,0,input);
-    assert.deepEqual(scores().map((score,i)=>score-before[i]),[points,points,points,1]);
+    const award=Number((points*1.2).toFixed(3));
+    assert.deepEqual(scores().map((score,i)=>Number((score-before[i]).toFixed(3))),[award,award,award,0.6]);
   }
 });
 
@@ -54,11 +55,11 @@ test('chapter answers persist once, translations affect credit, and final comple
   assert.equal(answer(1,1).completion.finished,false);
   assert.equal(answer(2,0).completion.finished,true);
   assert.equal(answer(2,2).questions[2].choice,0);
-  assert.equal(strengthFor(store.db,'word','椅子').score,1);
-  assert.equal(strengthFor(store.db,'character','椅').score,1);
+  assert.equal(strengthFor(store.db,'word','椅子').score,0.5);
+  assert.equal(strengthFor(store.db,'character','椅').score,0.5);
   assert.equal(strengthFor(store.db,'word','茶').score,null);
-  assert.equal(strengthFor(store.db,'word','水').score,-1);
-  assert.equal(strengthFor(store.db,'character','水').score,-1);
+  assert.equal(strengthFor(store.db,'word','水').score,null);
+  assert.equal(strengthFor(store.db,'character','水').score,null);
   assert.deepEqual(storySummary(store,'quiz').quiz,{correct:2,total:3});
 });
 

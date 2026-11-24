@@ -17,10 +17,11 @@ test('a saved text-only cover supports word review in its own sentence without a
   assert.ok(token>=0);
   const action={storyId:'apples',chapter:-1,paragraph:0,token,id:'cover-mark',kind:'difficulty' as const};
   recordAction(store,action);recordAction(store,action);
-  assert.equal(strengthFor(store.db,'word','苹果').score,-3);
+  assert.equal(strengthFor(store.db,'word','苹果').score,null);
   assert.equal(usageHistory(store,'果')[0].sentence,'商店里有三个苹果吗？');
   assert.deepEqual(store.position('apples'),{chapter:0,paragraph:0});
   for(const [i] of original.chapters.entries())finishChapter(store,'apples',i);
+  assert.equal(strengthFor(store.db,'word','苹果').score,-3);
   assert.deepEqual(storySummary(store,'apples').marked,[{text:'苹果',sentences:['商店里有三个苹果吗？']}]);
   store.db.close();
 });

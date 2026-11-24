@@ -1,7 +1,7 @@
 import {api,el,link,ui} from '../ui.js';
 import {icon} from '../icons.js';
 
-const labels = {gray:'Unseen',red:'Struggling',yellow:'Learning',green:'Strong'};
+const labels = {gray:'Unseen',red:'Struggling',yellow:'Learning',green:'Strong',gold:'Perfect'};
 const labelFor = kind => kind === 'word' ? 'Words' : 'Characters';
 const sizes = [20,50,100,200];
 const libraryUrl = (kind,level,page=1,size=localStorage.getItem('libraryPageSize')||50,q='',filter='') =>
@@ -109,21 +109,23 @@ function strengthMeter(text){
   meter.setAttribute('role','meter');
   meter.setAttribute('aria-label','Reading strength for '+text);
   meter.setAttribute('aria-valuemin','-7');
-  meter.setAttribute('aria-valuemax','12');
+  meter.setAttribute('aria-valuemax','36');
+  meter.setAttribute('aria-description','Perfect at 36 points.');
   const marker=el('span',null,'lib-strength-marker');
   const bands={};
-  for(const color of ['gray','red','yellow','green']){
+  for(const color of ['gray','red','yellow','green','gold']){
     const band=el('span',null,'lib-strength-band lib-'+color);
-    band.title=labels[color];
+    band.title=color==='gold'?'Perfect at 36 points':labels[color];
     bands[color]=band;
     meter.append(band);
   }
   function update({score,color}){
     // Each band's endpoints keep the marker visibly inside its status color.
-    const ranges={red:[-6,-1],yellow:[0,5],green:[6,12]};
+    const ranges={red:[-6,0],yellow:[0,6],green:[6,36]};
     const range=ranges[color];
     const fraction=range?(score-range[0])/(range[1]-range[0]):0;
-    marker.style.left=(color==='gray'?'0':10+80*fraction)+'%';
+    marker.style.left=(color==='gold'?100:color==='gray'?0:10+(color==='green'?90:80)*fraction)+'%';
+    marker.className='lib-strength-marker lib-'+color;
     bands[color].append(marker);
     meter.setAttribute('aria-valuenow',String(score??-7));
     meter.setAttribute('aria-valuetext',labels[color]);
@@ -143,21 +145,33 @@ async function renderDetail(root,kind,text,sense) {
   const badge=el('label',null,'lib-status lib-'+item.color);
   const select=el('select');
   const strength=strengthMeter(text);
+  const time=el('time');
+  function updateSeen(timestamp){
+    time.hidden=timestamp==null;
+    if(timestamp==null)return;
+    const seen=new Date(timestamp);
+    time.textContent='Last seen '+seen.toLocaleDateString(undefined,{dateStyle:'medium'});
+    time.dateTime=seen.toISOString();
+  }
   strength.update(item);
+  updateSeen(item.lastSeen);
   select.setAttribute('aria-label','Reading status for '+text);
-  for(const [color,label] of Object.entries(labels)) select.append(new Option(label,color,false,color===item.color));
+  for(const [color,label] of Object.entries(labels)){
+    select.append(new Option(label,color,false,color===item.color));
+  }
   select.onchange=async()=>{
     select.disabled=true;
     try{
       const result=await api('/api/library?'+query,{color:select.value});
       item.color=result.color;badge.className='lib-status lib-'+item.color;
       strength.update(result);
+      updateSeen(result.lastSeen);
     }catch(error){select.value=item.color;ui.notice(error.message);}
     finally{select.disabled=false;}
   };
   badge.append(select);
   header.append(el('p',labelFor(kind)+(item.level ? ' · HSK '+item.level : ''),'overline'),badge,headword);
-  entry.append(header,strength.meter);
+  entry.append(header,strength.meter,time);
 
   const readings = new Map();
   for (const s of item.senses) {

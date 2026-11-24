@@ -8,7 +8,40 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {startSession,gradeCard,flashcardHistory} from '../src/flashcards.ts';
-import {strengthFor,setStrength} from '../src/strength.ts';
+import {strengthFor,setStrength,hskReadingProgress} from '../src/strength.ts';
+import {encounterFor} from '../src/encounters.ts';
+import {finishChapter} from '../src/completion.ts';
+
+test('upgrading backfills encounters once and preserves scores, activity and HSK progress',async t=>{
+  const dir=await mkdtemp(join(tmpdir(),'dudian-upgrade-'));
+  t.after(()=>rm(dir,{recursive:true,force:true}));
+  const file=join(dir,'reader.sqlite'),old=new ReadingStore(file);
+  const at=Date.UTC(2025,0,1),week=7*86_400_000;
+  finishChapter(old,'tea-shop',0,at);
+  const deck=startSession(old.db,{kind:'word',words:['朋友']});
+  gradeCard(old.db,deck.id,0,'correct',at+1000);
+  setStrength(old.db,'word','银行','green');
+  old.db.exec("UPDATE reading_strength SET score=12 WHERE text='银行'");
+  const level=hskReadingProgress(old.db);
+  const history=old.db.prepare('SELECT * FROM score_changes ORDER BY rowid').all();
+  old.db.exec('DROP TABLE item_encounters');
+  old.db.close();
+  const upgradedAt=Date.now(),store=new ReadingStore(file);
+  let fallback;
+  try{
+    assert.equal(hskReadingProgress(store.db),level);
+    assert.deepEqual(store.db.prepare('SELECT * FROM score_changes ORDER BY rowid').all(),history);
+    assert.equal(strengthFor(store.db,'word','银行').score,12);
+    assert.equal(encounterFor(store.db,'茶').lastSeen,at);
+    assert.deepEqual(encounterFor(store.db,'朋'),{lastSeen:at+1000,dueAt:at+1000+week});
+    fallback=encounterFor(store.db,'银行');
+    assert.ok(fallback.lastSeen!>=upgradedAt);
+    assert.equal(fallback.dueAt,fallback.lastSeen!+week);
+  }finally{store.db.close();}
+  const reopened=new ReadingStore(file);
+  try{assert.deepEqual(encounterFor(reopened.db,'银行'),fallback);}
+  finally{reopened.db.close();}
+});
 
 test('existing single-character scores and open flashcards converge on the character entry',async t=>{
   const dir=await mkdtemp(join(tmpdir(),'dudian-library-'));
@@ -71,7 +104,7 @@ test('a new learner browses gray Library items and can follow word–character l
   const update=(kind:string,color:string)=>fetch(base+'/api/library?'+new URLSearchParams({kind,text:'茶'}),{
     method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({color})
   });
-  for(const color of ['red','yellow','green','gray']){
+  for(const color of ['red','yellow','green','gold','gray']){
     assert.equal((await (await update('character',color)).json()).color,color);
     const filtered=await (await fetch(base+'/api/library?kind=character&level=1&status='+color+'&q=茶&pageSize=20')).json();
     assert.equal(filtered.total,1);
@@ -79,6 +112,7 @@ test('a new learner browses gray Library items and can follow word–character l
     assert.equal(filtered.items[0].text,'茶');
     const word=await (await fetch(base+'/api/library?kind=word&text=茶')).json();
     assert.equal(word.color,color);
+    if(color==='gold')assert.equal(word.score,36);
   }
   assert.equal((await update('word','invalid')).status,400);
   assert.equal((await (await update('word','green')).json()).color,'green');

@@ -39,7 +39,7 @@ test('practice summary retains actual gains, losses and capped scores on retry a
   let session=deck;
   for(let i=0;i<deck.total;i++){
     const text=session.card!.text;
-    if(i===2)adjustStrength(store.db,'character',text,12);
+    if(i===2)adjustStrength(store.db,'character',text,36);
     session=gradeCard(store.db,deck.id,i,i===1?'incorrect':'correct');
   }
   assert.deepEqual(session.results?.slice(0,3).map(item=>item.points),[3,-3,0]);

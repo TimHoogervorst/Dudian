@@ -1,5 +1,6 @@
 import { generateStory, type CandidateWriter, type GenerationStage } from './story-generation.ts';
-import { buildPlan, difficulties, validLength, type StoryPlan, type StoryLength, type Difficulty } from './story-plan.ts';
+import { difficulties, validLength, type StoryPlan, type StoryLength, type Difficulty } from './story-plan.ts';
+import {practicePreview,confirmedPlan} from './practice-preview.ts';
 import { HttpError, type ReadingStore } from './store.ts';
 import {artSettings,ensureArt,queueArtwork} from './cover-art.ts';
 
@@ -35,7 +36,7 @@ export function startGeneration(store:ReadingStore,difficulty:Difficulty,minutes
   const report=(stage:GenerationStage,detail?:string)=>store.db.prepare('UPDATE generation_job SET stage=?,detail=? WHERE id=1').run(stage,detail??null);
   setImmediate(async()=>{
     try {
-      const plan=confirmed??buildPlan(store,difficulty,minutes);
+      const plan=confirmed??confirmedPlan(store,practicePreview(store,{difficulty,minutes}).id,difficulty,minutes);
       const story=await generateStory(store,plan,write,report);
       store.db.prepare("UPDATE generation_job SET stage='ready',storyId=? WHERE id=1").run(story.id);
       if(artSettings(store).enabled)queueArtwork(store,story.id);

@@ -9,7 +9,19 @@ export function startWordReview(words) {
   return startReview({kind:'word',words});
 }
 function libraryAction({root,parts}) {
-  if (parts[1]==='entry') return;
+  if(parts[1]==='entry'){
+    const entry=root.querySelector('.lib-entry');
+    if(!entry)return;
+    const button=el('button','Practice this '+(parts[0]==='word'?'word':'character'),'button');
+    button.onclick=async()=>{
+      button.disabled=true;
+      try{await startWordReview([parts[2]]);}
+      catch(error){ui.notice(error.message);}
+      finally{button.disabled=false;}
+    };
+    entry.append(button);
+    return;
+  }
   const button = el('button','Practice','button lib-review');
   button.onclick = async () => {
     button.disabled=true;

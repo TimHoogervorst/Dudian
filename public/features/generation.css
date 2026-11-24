@@ -61,3 +61,4 @@
 .subject-card{flex-direction:column;text-align:center;gap:.3rem;padding:.7rem .35rem}
 .subject-card strong{font-size:1.25rem}.subject-card span{font: .85rem/1.25 var(--sans)}
 @media(max-width:640px){.subject-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,6rem),1fr))}}
+.focus-state[data-color=gold]::before{background:#bd860f}

@@ -83,7 +83,7 @@ export function setup(ui) {
     subject.append(el('legend','Subject'),topics);
     const focus=el('fieldset',null,'practice-focus');
     const cards=el('div',null,'focus-cards');
-    focus.append(el('legend','Character focus'),cards,el('p','Estimates assume unaided reading in every chapter.','focus-note'));
+    focus.append(el('legend','Character focus'),cards,el('p','Base estimates assume unaided reading. Your final story score determines the points awarded.','focus-note'));
     form.append(el('h1','Create a story'),mode,storyType,difficulty,duration,subject,focus,button,status);
     layout.append(form);
     if(current){
@@ -204,7 +204,7 @@ export function setup(ui) {
 }
 
 function focusState(color){
-  const labels={gray:'Unseen',red:'Struggling',yellow:'Learning',green:'Strong'};
+  const labels={gray:'Unseen',red:'Struggling',yellow:'Learning',green:'Strong',gold:'Perfect'};
   const state=el('span',labels[color],'focus-state');
   state.dataset.color=color;
   return state;

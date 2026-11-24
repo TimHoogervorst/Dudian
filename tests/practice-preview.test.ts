@@ -2,7 +2,29 @@
 import assert from 'node:assert/strict';
 import {ReadingStore} from '../src/store.ts';
 import {practicePreview,confirmedPlan} from '../src/practice-preview.ts';
-import {adjustStrength,hskReadingProgress} from '../src/strength.ts';
+import {adjustStrength,hskReadingProgress,setStrength} from '../src/strength.ts';
+import {setPreferences} from '../src/story-plan.ts';
+
+test('Hard fills six focus cards with struggling reviews and eligible new characters',t=>{
+  const store=new ReadingStore();t.after(()=>store.db.close());
+  const struggling=['昨天','先生','椅子','学生','老师','朋友'];
+  for(const word of struggling.slice(0,3))setStrength(store.db,'word',word,'red');
+  setStrength(store.db,'word','东西','yellow');
+  const preview=()=>practicePreview(store,{difficulty:'hard',minutes:30});
+  const mixed=preview();
+  const plan=confirmedPlan(store,mixed.id,'hard',30);
+  assert.deepEqual(new Set(plan.reviewWords),new Set(struggling.slice(0,3)));
+  assert.deepEqual(mixed.cards.map(c=>c.color),['red','red','red','gray','gray','gray']);
+  assert.equal(plan.newCharacters.length,3);
+  assert.equal(practicePreview(store,{difficulty:'medium',minutes:30}).cards.length,3);
+  assert.equal(practicePreview(store,{difficulty:'easy',minutes:30}).cards.length,2);
+  setPreferences(store,{difficulty:'hard',ceilings:{easy:2,medium:3,hard:1}});
+  const limited=preview();
+  assert.equal(confirmedPlan(store,limited.id,'hard',30).newCharacters.length,1);
+  assert.ok(limited.cards.some(c=>c.text==='东西'));
+  for(const word of struggling.slice(3))setStrength(store.db,'word',word,'red');
+  assert.deepEqual(new Set(preview().cards.map(c=>c.text)),new Set(struggling));
+});
 
 test('a reroll replaces one focus, survives resizing, and binds generation to its preview', t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
@@ -26,7 +48,7 @@ test('practice estimates respect strength and HSK caps', t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
   const options={difficulty:'hard',minutes:30} as const;
   const draft=practicePreview(store,options);
-  for(const c of draft.cards)adjustStrength(store.db,c.kind,c.text,12);
+  for(const c of draft.cards)adjustStrength(store.db,c.kind,c.text,36);
   const full=practicePreview(store,{...options,previewId:draft.id});
   assert.ok(full.cards.every(c=>c.gain===0));
   assert.equal(full.projected,full.level);

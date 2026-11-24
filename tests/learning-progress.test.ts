@@ -16,10 +16,10 @@ test('progress counts actual practice changes and unique items still Strong in l
   adjustStrength(db,'character','茶',2,now);
   setStrength(db,'word','苹果','green');
   const month=learningProgress(store,'month','Europe/Amsterdam',now);
-  assert.deepEqual([month.net,month.gained,month.lost,month.strong],[18,20,2,2]);
+  assert.deepEqual([month.net,month.gained,month.lost,month.strong],[21,23,2,2]);
   assert.deepEqual(month.examples.map(i=>i.text),['茶','朋友']);
   assert.equal(month.buckets[23].points,null);
-  assert.equal(month.buckets[24].points,16);
+  assert.equal(month.buckets[24].points,19);
   assert.equal(month.buckets[25].points,0);
   assert.equal(month.buckets[29].points,2);
   assert.equal(month.buckets[30].points,null);
@@ -27,7 +27,7 @@ test('progress counts actual practice changes and unique items still Strong in l
   assert.equal(week.buckets[0].date,'2026-03-30');
   assert.equal(week.strong,1);
   assert.equal(week.net,2);
-  assert.equal(learningProgress(store,'year','Europe/Amsterdam',now).buckets[2].points,18);
+  assert.equal(learningProgress(store,'year','Europe/Amsterdam',now).buckets[2].points,21);
   assert.throws(()=>learningProgress(store,'bad','UTC',now));
 });
 

@@ -1,6 +1,7 @@
 import type {DatabaseSync} from 'node:sqlite';
 import {ReadingStore,HttpError} from './store.ts';
-import {adjustStoryStrength,strengthFor} from './strength.ts';
+import {readingItems,seeItem} from './encounters.ts';
+import {awardStory,recordStoryPoints,storyFocus,questionCharacters} from './story-scoring.ts';
 import {ensureActions} from './word-actions.ts';
 import {storyDifficulty} from './story-difficulty.ts';
 
@@ -34,30 +35,32 @@ export function finishChapter(store:ReadingStore,storyId:string,chapter:number,n
     if(Number(answered?.total)<questions.length)throw new HttpError(409,'Answer the chapter questions first.');
     const first=db.prepare('INSERT OR IGNORE INTO chapter_completions VALUES(?,?,?,?)').run(storyId,chapter,now,words.length);
     if(first.changes) {
-      const preview=story.preview;
-      const targets=new Set([...(preview?.words??[]),...(preview?.review??[])].map(item=>item.text));
-      if(preview?.compound)targets.add(preview.compound.text);
-      for(const item of preview?.characters??[])targets.add(item.text);
-      for(const char of preview?.reviewCharacters??[])targets.add(char);
-      const focusPoints=storyDifficulty[story.difficulty??'easy'].points;
-      const aided=new Set(db.prepare('SELECT DISTINCT word FROM word_actions WHERE story_id=? AND chapter=?').all(storyId,chapter).map(row=>row.word));
-      const blocked=new Set([...testedCharacters,...aided].join(''));
+      const tier=storyFocus(story);
+      const full=storyDifficulty[story.difficulty??'easy'].points;
+      const aided=db.prepare('SELECT DISTINCT word FROM word_actions WHERE story_id=? AND chapter=?').all(storyId,chapter);
+      const blocked=readingItems(aided.map(row=>String(row.word)));
+      for(const text of [...testedWords,...testedCharacters])blocked.add(text);
+      const appearances=readingItems(words);
+      const correctChars=new Set<string>();
       for(const row of db.prepare('SELECT question,choice,english FROM quiz_attempts WHERE story_id=? AND chapter=?').all(storyId,chapter)){
         const q=questions[Number(row.question)];
-        if(!q.reviewRound && (Array.from(q.word).length===1 || row.choice!==q.correct || row.english))
-          for(const char of q.word)blocked.add(char);
+        if(!q.reviewRound && row.choice===q.correct && !row.english){
+          for(const char of questionCharacters(q)){correctChars.add(char);appearances.add(char);}
+        }
       }
-      const characters=new Set<string>();
-      for(const word of new Set(words)){
-        for(const char of word)if(/\p{Script=Han}/u.test(char))characters.add(char);
-        if(Array.from(word).length>1 && !aided.has(word) && !testedWords.has(word))adjustStoryStrength(db,storyId,word,targets.has(word)?focusPoints:1,now);
-      }
-      for(const char of characters){
-        if(!blocked.has(char))adjustStoryStrength(db,storyId,char,targets.has(char)?focusPoints:1,now);
-        else if(!words.includes(char) && strengthFor(db,'character',char).score===null)adjustStoryStrength(db,storyId,char,0,now);
+      for(const text of appearances){
+        if(!blocked.has(text)){
+          const focus=tier(text);
+          const gain=focus==='strong'?full:focus==='other'?0.25:focus==='soft' && correctChars.has(text)?0.5:0;
+          if(gain)recordStoryPoints(db,storyId,chapter,text,gain,now,'appearance');
+        }
+        seeItem(db,text,now);
       }
       const completed=db.prepare('SELECT COUNT(*) AS total FROM chapter_completions WHERE story_id=?').get(storyId);
-      if(Number(completed?.total)===story.chapters.length)db.prepare('INSERT OR IGNORE INTO story_completions VALUES(?,?)').run(storyId,now);
+      if(Number(completed?.total)===story.chapters.length){
+        const finished=db.prepare('INSERT OR IGNORE INTO story_completions VALUES(?,?)').run(storyId,now);
+        if(finished.changes)awardStory(db,story,now);
+      }
     }
     if(ownsTransaction)db.exec('COMMIT');
   }catch(error){if(ownsTransaction)db.exec('ROLLBACK');throw error;}

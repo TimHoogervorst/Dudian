@@ -44,7 +44,7 @@ test('a cast lookup or difficulty mark and chapter completion give no vocabulary
   finishChapter(store,'rain',0);
   assert.equal(strengthFor(store.db,'word','包包').score,null);
   assert.equal(strengthFor(store.db,'character','包').score,null);
-  assert.equal(strengthFor(store.db,'word','来').score,1);
+  assert.equal(strengthFor(store.db,'word','来').score,0.25);
   store.db.close();
 });
 

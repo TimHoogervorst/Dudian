@@ -1,7 +1,10 @@
 import type {DatabaseSync} from 'node:sqlite';
 import {catalog} from './catalog.ts';
+import {recordStoryPoints} from './story-scoring.ts';
+import {completionFor} from './completion.ts';
+import {readingItems,seeItem} from './encounters.ts';
 import {ReadingStore,HttpError,type Token,type Story} from './store.ts';
-import {adjustStoryStrength,strengthFor} from './strength.ts';
+import {strengthFor} from './strength.ts';
 
 // Authored senses for the bundled chapter, including copies already saved by earlier versions.
 const teaSenses: Record<string,string> = {
@@ -55,7 +58,14 @@ export function recordAction(store:ReadingStore, action:WordAction, now=Date.now
   try {
     const result=db.prepare('INSERT OR IGNORE INTO word_actions VALUES(?,?,?,?,?,?,?,?)')
       .run(action.id,story.id,action.chapter,action.paragraph,action.token,text,action.kind,now);
-    if (result.changes && action.kind==='difficulty') adjustStoryStrength(db,story.id,text,-3,now);
+    if(result.changes){
+      if(action.kind==='difficulty'){
+        const progress=completionFor(store,story.id);
+        if(!progress.finished && !progress.chapters.includes(action.chapter))
+          recordStoryPoints(db,story.id,action.chapter,text,-3,now,'incorrect');
+      }
+      for(const item of readingItems([text]))seeItem(db,item,now);
+    }
     db.exec('COMMIT');
   } catch(error) {db.exec('ROLLBACK');throw error;}
   return {text,...(action.kind==='difficulty'?{color:strengthFor(db,'word',text).color}:{}),sense:selected.id,pinyin:selected.pinyin,meaning:selected.meaning};

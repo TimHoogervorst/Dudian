@@ -35,9 +35,10 @@ export function learningProgress(store:ReadingStore,period:string,zone:string,no
     if(after<statusScores.green)mastered.delete(text);
     if(row.manual)continue;
     if(before<statusScores.green && after>=statusScores.green)mastered.set(text,{kind:row.kind as ItemKind,text});
-    const delta=after-before;
+    const delta=Math.round((after-before)*1000);
     gained+=Math.max(0,delta);lost+=Math.max(0,-delta);bucket.points+=delta;
   }
-  return {gained,lost,net:gained-lost,strong:mastered.size,examples:[...mastered.values()].reverse().slice(0,5),buckets,
+  return {gained:gained/1000,lost:lost/1000,net:(gained-lost)/1000,strong:mastered.size,examples:[...mastered.values()].reverse().slice(0,5),
+    buckets:buckets.map(bucket=>({...bucket,points:bucket.points===null?null:bucket.points/1000})),
     trackedSince:trackedSince>=first.toISOString().slice(0,10)?trackedSince:null};
 }

@@ -41,7 +41,7 @@ Start every new learner at HSK 1 in the six-level curriculum. All entries begin 
 
 Assign each character to the earliest curriculum level containing a word that uses it. Show examples from the learner’s level first. In a word entry, display each character’s pronunciation in that word and link to its other readings and uses.
 
-A difficulty mark immediately lowers the selected word’s reading strength. The occurrence appears in its characters’ usage histories while their strength scores stay intact. A single-tap lookup carries no difficulty penalty or review timer and excludes that word from the chapter’s unaided-reading gain. On chapter completion, award a small gain once per distinct word read unaided. Opening a chapter awards no credit. For new stories, unaided encounters with teaching and review targets earn 1 point on Easy, 2 on Medium, and 3 on Hard. Other eligible vocabulary earns 1 point.
+A difficulty mark records the occurrence in usage history and queues its penalty for story completion. A lookup excludes the affected vocabulary from unaided appearance credit. Each completed chapter saves its base points. The final chapter applies the story multiplier and posts the award to the Library. [Story scoring](reading-strength.md)
 
 Group material under HSK levels 1–6. Use green for strong reading knowledge, yellow for uncertain, red for struggling, and gray for unseen. Mix strong items with weaker items in flashcard practice. Reveal pronunciation and meaning on request. Support self-assessment as correct, almost, or incorrect, with right, down, or left swipes respectively.
 
@@ -102,9 +102,9 @@ Generate and save comprehension questions in the background story-generation job
 
 New chapters end with one inline comprehension question on Easy, two on Medium, and three on Hard. Hover over the Chinese words for dictionary help or tap a prompt word. Each question has three choices and one correct answer. **Show English** reveals the prompt and choices. Submitting the final answer marks the chapter complete and offers the next chapter or story summary. Previously saved chapters keep their original checks.
 
-Save the first answer and its reading-strength updates together. Immediately show the correct choice and supporting sentence. Leaving and returning resumes the check with submitted answers locked. Record chapter completion after all its questions have answers, at any score. The saved check works without contacting the AI service.
+Save the first answer and its pending score together. Immediately show the correct choice and supporting sentence. Leaving and returning resumes the check with submitted answers locked. Record chapter completion after all its questions have answers, at any score. The saved check works without contacting the AI service.
 
-Apply +1, +2, or +3 according to the saved story difficulty for an unaided correct answer and −1 for an incorrect answer to the tested word and to each explicitly tested teaching or review character. A correct answer after revealing English counts toward the quiz score and earns zero strength points. Exclude tested items from the ordinary chapter-completion strength bonus. For a question testing 椅子 with 椅 as a teaching target, update the word 椅子 and the character 椅.
+Use the story focus tier to score the tested word and any explicitly tested characters. Revealing English before a correct answer counts toward quiz accuracy and earns zero direct points. Tested items receive their answer outcome once per attempt and have no separate passage award. [Scoring and final award](reading-strength.md)
 
 ## Local data and persistence
 

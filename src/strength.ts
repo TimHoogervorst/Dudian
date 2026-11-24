@@ -1,5 +1,6 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import {catalog,entryKind,type ItemKind} from './catalog.ts';
+import {encounterFor,perfectScore,seeItem} from './encounters.ts';
 
 const statements = new WeakMap<DatabaseSync, {read: StatementSync; adjust: StatementSync; log:StatementSync}>();
 function strengthStatements(db: DatabaseSync) {
@@ -12,8 +13,8 @@ function strengthStatements(db: DatabaseSync) {
   const prepared = {
     log: db.prepare('INSERT INTO score_changes(kind,text,before_score,after_score,at,manual) VALUES(?,?,?,?,?,?)'),
     read: db.prepare('SELECT score FROM reading_strength WHERE kind=? AND text=?'),
-    adjust: db.prepare(`INSERT INTO reading_strength(kind,text,score) VALUES(?,?,min(12,max(-6,?)))
-      ON CONFLICT(kind,text) DO UPDATE SET score=min(12,max(-6,reading_strength.score+excluded.score))
+    adjust: db.prepare(`INSERT INTO reading_strength(kind,text,score) VALUES(?,?,min(${perfectScore},max(-6,?)))
+      ON CONFLICT(kind,text) DO UPDATE SET score=min(${perfectScore},max(-6,round(reading_strength.score+?,3)))
       RETURNING score`),
   };
   statements.set(db, prepared);
@@ -21,10 +22,10 @@ function strengthStatements(db: DatabaseSync) {
 }
 
 function strength(score: number | null) {
-  const color = score === null ? 'gray' : score < 0 ? 'red' : score >= 6 ? 'green' : 'yellow';
+  const color = score === null ? 'gray' : score < 0 ? 'red' : score >= perfectScore ? 'gold' : score >= 6 ? 'green' : 'yellow';
   return {score, color};
 }
-export const statusScores={gray:null,red:-3,yellow:1,green:6} as const;
+export const statusScores={gray:null,red:-3,yellow:1,green:6,gold:perfectScore} as const;
 function changeStrength(db:DatabaseSync,kind:ItemKind,text:string,manual:boolean,now:number,write:(before:number|null)=>number|null){
   kind=entryKind(kind,text);
   const own=!db.isTransaction;
@@ -42,8 +43,12 @@ export function setStrength(db:DatabaseSync,kind:ItemKind,text:string,color:keyo
   return changeStrength(db,kind,text,true,Date.now(),before=>{
     if(strength(before).color===color)return before;
     const score=statusScores[color];
-    if(score===null)db.prepare('DELETE FROM reading_strength WHERE kind=? AND text=?').run(kind,text);
+    if(score===null){
+      db.prepare('DELETE FROM reading_strength WHERE kind=? AND text=?').run(kind,text);
+      db.prepare('DELETE FROM item_encounters WHERE text=?').run(text);
+    }
     else db.prepare('INSERT INTO reading_strength VALUES(?,?,?) ON CONFLICT(kind,text) DO UPDATE SET score=excluded.score').run(kind,text,score);
+    if(score!==null)seeItem(db,text,Date.now(),true);
     return score;
   });
 }
@@ -53,19 +58,22 @@ export function strengthFor(db: DatabaseSync, kind: ItemKind, text: string) {
 }
 export function adjustStrength(db: DatabaseSync, kind: ItemKind, text: string, delta: number,now=Date.now()) {
   kind=entryKind(kind,text);
-  return changeStrength(db,kind,text,false,now,()=>Number(strengthStatements(db).adjust.get(kind,text,delta)!.score));
+  return changeStrength(db,kind,text,false,now,before=>before===perfectScore?before:Number(strengthStatements(db).adjust.get(kind,text,delta,delta)!.score));
 }
 
-// Called inside the same transaction as the reading action. Only the actual
-// change after clamping belongs to this story, even if other stories are open.
-export function adjustStoryStrength(db:DatabaseSync,id:string,text:string,delta:number,now=Date.now()){
-  if(entryKind('word',text)==='word')return adjustStrength(db,'word',text,delta,now);
-  const before=strengthFor(db,'character',text).score??0;
-  const after=adjustStrength(db,'character',text,delta,now);
-  db.prepare(`INSERT INTO story_character_points(story_id,character,points)
-    SELECT ?,?,? WHERE NOT EXISTS(SELECT 1 FROM story_completions WHERE story_id=?)
-    ON CONFLICT(story_id,character) DO UPDATE SET points=points+excluded.points`).run(id,text,after.score!-before,id);
-  return after;
+export type Evidence='appearance'|'correct'|'incorrect'|'assisted';
+// Call inside the transaction recording the attempt so retries cannot settle it twice.
+export function encounterPoints(db:DatabaseSync,text:string,delta:number,now:number,evidence:Evidence){
+  const {dueAt}=encounterFor(db,text);
+  const overdue=dueAt!==null && dueAt<=now;
+  seeItem(db,text,now,evidence==='correct'||evidence==='incorrect');
+  if(!overdue)return delta;
+  return evidence==='incorrect'?2*delta:0;
+}
+export function scoreEncounter(db:DatabaseSync,kind:ItemKind,text:string,delta:number,now:number,evidence:Evidence){
+  const points=encounterPoints(db,text,delta,now,evidence);
+  if(points===0)return strengthFor(db,kind,text);
+  return adjustStrength(db,kind,text,points,now);
 }
 
 export function recordedStrengths(db: DatabaseSync) {
@@ -73,6 +81,16 @@ export function recordedStrengths(db: DatabaseSync) {
   return db.prepare('SELECT kind,text,score FROM reading_strength').all().map(row=>({
     kind:row.kind as ItemKind, text:String(row.text), score:Number(row.score),
   }));
+}
+
+// A lookup can establish an encounter before an item earns its first point.
+export function reviewCandidates(db:DatabaseSync,now:number){
+  strengthStatements(db);
+  const rows=db.prepare(`SELECT text,score,due_at FROM reading_strength LEFT JOIN item_encounters USING(text)
+    UNION ALL SELECT text,0,due_at FROM item_encounters LEFT JOIN reading_strength USING(text)
+    WHERE score IS NULL AND due_at<=?`).all(now);
+  return rows.map(row=>({text:String(row.text),kind:entryKind('word',String(row.text)),score:Number(row.score),
+    dueAt:row.due_at===null?Infinity:Number(row.due_at)}));
 }
 
 const curriculumBands=Array.from({length:6},(_,i)=>({

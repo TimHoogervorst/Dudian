@@ -3,6 +3,7 @@ import {catalog} from './catalog.ts';
 import type {ChapterQuestion,ReadingStore,Story} from './store.ts';
 import type {StoryPlan} from './story-plan.ts';
 import {strengthFor} from './strength.ts';
+import {encounterFor,perfectScore} from './encounters.ts';
 
 export function reviewBoundaries(plan:StoryPlan){
   const count={easy:0,medium:1,hard:2}[plan.difficulty];
@@ -20,12 +21,15 @@ export function planWordReviews(store:ReadingStore,plan:StoryPlan){
     .all(Date.now()-86400000).map(row=>String(row.word)));
   const ranked=[...new Set([...focus,...plan.background])].filter(word=>[...word].length>1 && !cooling.has(word) && catalog.get('word',word))
     .map(word=>({word,focus:focus.has(word),related:[...word].filter(c=>chars.has(c)).length,
-      score:strengthFor(store.db,'word',word).score??5,tie:Math.random()}))
-    .sort((a,b)=>Number(b.focus)-Number(a.focus)||b.related-a.related||a.score-b.score||b.tie-a.tie)
-    .slice(0,size*boundaries.length).map(item=>item.word);
+      score:strengthFor(store.db,'word',word).score??5,dueAt:encounterFor(store.db,word).dueAt??Infinity,tie:Math.random()}))
+    .filter(item=>item.score<perfectScore)
+    .sort((a,b)=>Number(b.focus)-Number(a.focus)||b.related-a.related||a.score-b.score||b.tie-a.tie);
+  const overdue=ranked.filter(item=>item.dueAt<=Date.now()).sort((a,b)=>a.dueAt-b.dueAt);
+  const reserved=overdue.slice(0,boundaries.length).map(item=>item.word);
+  const pool=[...new Set([...reserved,...ranked.map(item=>item.word)])].slice(0,size*boundaries.length);
   return boundaries.map((chapter,i)=>{
-    const assigned=ranked.filter((_,index)=>index%boundaries.length===i);
-    const words=[...assigned,...ranked.filter(word=>!assigned.includes(word))].slice(0,size);
+    const assigned=pool.filter((_,index)=>index%boundaries.length===i);
+    const words=[...assigned,...pool.filter(word=>!assigned.includes(word))].slice(0,size);
     return {chapter,words};
   });
 }

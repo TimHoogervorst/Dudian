@@ -2,9 +2,9 @@ import {catalog} from './catalog.ts';
 import {dictionaryTokens} from './cover-text.ts';
 import {ReadingStore,HttpError,type Story} from './store.ts';
 import {completionFor,finishChapter,ensureCompletions} from './completion.ts';
-import {adjustStoryStrength} from './strength.ts';
+import {recordAnswer} from './story-scoring.ts';
 import {sentenceText} from './word-actions.ts';
-import {storyDifficulty} from './story-difficulty.ts';
+import {questionWords,readingItems,seeItem} from './encounters.ts';
 
 export function readerChapters(store:ReadingStore,story:Story){
   ensureCompletions(store.db);
@@ -66,16 +66,15 @@ export function updateCheck(store:ReadingStore,id:string,index:number,input:any)
     }
     db.prepare('INSERT OR IGNORE INTO quiz_attempts(story_id,chapter,question) VALUES(?,?,?)').run(...key);
     if(input.action==='english'){
-      db.prepare('UPDATE quiz_attempts SET english=1 WHERE story_id=? AND chapter=? AND question=?').run(...key);
+      db.prepare('UPDATE quiz_attempts SET english=1 WHERE story_id=? AND chapter=? AND question=? AND choice IS NULL').run(...key);
     }else{
       const row=db.prepare('UPDATE quiz_attempts SET choice=? WHERE story_id=? AND chapter=? AND question=? AND choice IS NULL RETURNING english')
         .get(input.choice,...key);
       if(row){
-        const delta=input.choice!==question.correct?-1:row.english?0:storyDifficulty[story.difficulty??'easy'].points;
-        if(delta){
-          adjustStoryStrength(db,id,question.word,delta);
-          for(const char of question.characters)if(char!==question.word)adjustStoryStrength(db,id,char,delta);
-        }
+        const now=Date.now();
+        recordAnswer(db,story,index,input.question,input.choice===question.correct,Boolean(row.english),now);
+        for(const text of readingItems([...questionWords(question.prompt),...questionWords(question.choices[input.choice])]))
+          seeItem(db,text,now);
         const answered=db.prepare('SELECT count(choice) AS total FROM quiz_attempts WHERE story_id=? AND chapter=?').get(id,index);
         if(answered?.total===chapter.questions!.length)finishChapter(store,id,index);
       }

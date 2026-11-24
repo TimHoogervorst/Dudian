@@ -1,0 +1,11 @@
+# Mandarin audio for stories and Library cards
+
+Research note, 24 November 2026.
+
+Dudian’s ChatGPT sign-in can still generate the Chinese story. The app reads text from a streamed Responses API request. OpenAI documents that endpoint for plan-funded inference and documents Realtime audio separately with API-key authentication. I found no documented grant for generating speech with Dudian’s subscription token. [Dudian’s text provider](../src/provider.ts) · [ChatGPT plan inference](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference) · [Realtime authentication](https://developers.openai.com/api/docs/guides/realtime)
+
+For a consistent generated voice across phones and computers, Dudian could send a saved paragraph or a card’s selected reading to an opt-in speech provider on first playback. OpenAI currently recommends `gpt-realtime-2.1-mini` through the Realtime API for new speech integrations. The older Speech API models have a scheduled shutdown on 6 January 2027. The server can collect the audio chunks into a file, keep it in Dudian’s data volume and serve subsequent plays from that copy. Label synthesized narration as AI-generated. [Speech guide](https://developers.openai.com/api/docs/guides/text-to-speech) · [Receiving audio on the server](https://developers.openai.com/api/docs/guides/realtime-conversations)
+
+At current list prices, one minute of generated speech costs approximately US$0.024 for the audio output alone. That estimate uses 1,200 output audio tokens per minute at US$20 per million. Text and other billable tokens are additional. Saved clips make repeated listening inexpensive. [API pricing](https://developers.openai.com/api/docs/pricing) · [Realtime token accounting](https://developers.openai.com/api/docs/guides/voice-latency-cost)
+
+For a pronunciation trial, use one narrator and compare the same short sentence across devices. Include 行 in 银行 (*háng*) and 行走 (*xíng*). For cards, cache each reading independently and let the learner hear it in a word. For stories, cache by exact paragraph text and voice. Have a fluent speaker check the readings, tones and whether the recording follows the passage verbatim before choosing the provider.

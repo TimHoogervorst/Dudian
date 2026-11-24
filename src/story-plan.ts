@@ -52,5 +52,5 @@ export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: St
   const chapterCount=chapterCounts[minutes];
   const [min,max]=paragraphCounts[difficulty];
   return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40,
-    ceiling,...vocabularyFor(store,ceiling,now,excluded)};
+    ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded)};
 }

@@ -32,7 +32,7 @@ test('an offline contextual lookup and a retried difficulty mark have distinct c
     assert.deepEqual(usageHistory(store,'朋'),[]);
     recordAction(store,{...point,id:'mark-one',kind:'difficulty'},2000);
     const score=strengthFor(store.db,'word','朋友');
-    assert.equal(score.color,'red');
+    assert.equal(score.color,'gray');
     recordAction(store,{...point,id:'mark-one',kind:'difficulty'},3000);
     assert.deepEqual(strengthFor(store.db,'word','朋友'),score);
     assert.equal(strengthFor(store.db,'character','朋').color,'gray');

@@ -24,6 +24,22 @@ An estimate of how reliably the learner recognizes and understands an item while
 **Background vocabulary**  
 Words available to build a story around its learning goals. The learner starts with the HSK 1 word pool available for this purpose.
 
+**Incidental appearance**
+
+A character or word the learner encounters while reading a chapter outside its focus and without a question testing that item.
+
+**Overdue review**
+
+A recall check due after a gap in practice. The item keeps its reading strength while it waits for review.
+
+**Last seen**
+
+The time the learner most recently encountered a particular character or word. Seeing an item again while its review is overdue leaves the recall check pending.
+
+**Perfect**
+
+The endpoint of Strong for an individual character or word. A Perfect item retains its reading strength through time away and mistakes in practice. The learner can still lower it manually.
+
 **Review target**  
 A previously encountered character or word selected for deliberate practice in a story.
 

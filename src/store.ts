@@ -1,5 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { seedStory } from './seed.ts';
+import {migrateEncounters} from './encounters.ts';
 import {recoverCoverTokens} from './cover-text.ts';
 import type {Difficulty} from './story-plan.ts';
 
@@ -29,6 +30,10 @@ export class ReadingStore {
       INSERT OR IGNORE INTO learners VALUES(1,'admin');
       CREATE TABLE IF NOT EXISTS stories(id TEXT PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL, created_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS story_completions(story_id TEXT PRIMARY KEY REFERENCES stories(id),at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS pending_story_points(story_id TEXT NOT NULL REFERENCES stories(id),chapter INTEGER NOT NULL,
+        text TEXT NOT NULL,gain REAL NOT NULL,loss REAL NOT NULL,PRIMARY KEY(story_id,chapter,text));
+      CREATE TABLE IF NOT EXISTS story_awards(story_id TEXT PRIMARY KEY REFERENCES stories(id),incorrect INTEGER NOT NULL,
+        multiplier REAL NOT NULL,base REAL NOT NULL,penalties REAL NOT NULL,awarded REAL NOT NULL);
       CREATE TABLE IF NOT EXISTS story_character_points(story_id TEXT NOT NULL REFERENCES stories(id),character TEXT NOT NULL,points INTEGER NOT NULL,PRIMARY KEY(story_id,character));
       CREATE TABLE IF NOT EXISTS hidden_stories(story_id TEXT PRIMARY KEY REFERENCES stories(id));
       CREATE TABLE IF NOT EXISTS score_tracking(id INTEGER PRIMARY KEY CHECK(id=1),started_at INTEGER NOT NULL);
@@ -49,6 +54,7 @@ export class ReadingStore {
           SELECT 'character',text,score FROM reading_strength WHERE kind='word' AND length(text)=1;
         DELETE FROM reading_strength WHERE kind='word' AND length(text)=1;`);
       if(exists.get('flashcard_reviews'))this.db.exec("UPDATE flashcard_reviews SET kind='character' WHERE kind='word' AND length(text)=1");
+      migrateEncounters(this.db);
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }

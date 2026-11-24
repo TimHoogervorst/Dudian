@@ -1,4 +1,5 @@
 import {randomUUID} from 'node:crypto';
+import {encounterFor,perfectScore} from './encounters.ts';
 import {catalog,entryKind} from './catalog.ts';
 import {buildPlan,chapterCounts,difficulties,validLength,type Difficulty,type StoryLength,type StoryPlan} from './story-plan.ts';
 import {storyDifficulty} from './story-difficulty.ts';
@@ -34,7 +35,7 @@ function targets(plan:StoryPlan):Focus[]{
 
 function backgroundTarget(store:ReadingStore,plan:StoryPlan,excluded:Set<string>):Focus|undefined{
   const cooling=new Set(store.db.prepare("SELECT DISTINCT word FROM word_actions WHERE kind='difficulty' AND at>?").all(Date.now()-86400000).map(row=>row.word));
-  const word=plan.background.find(w=>!excluded.has(w) && !cooling.has(w) && catalog.get('word',w));
+  const word=plan.background.find(w=>!excluded.has(w) && !cooling.has(w) && strengthFor(store.db,'word',w).score!==perfectScore && catalog.get('word',w));
   if(word)return {word,role:'review',characters:[]};
 }
 
@@ -65,7 +66,7 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
     }
   }else{
     plan=buildPlan(store,difficulty,minutes);
-    focus=targets(plan).slice(0,{easy:2,medium:4,hard:6}[difficulty]);
+    focus=targets(plan).slice(0,storyDifficulty[difficulty].focusCards);
     while(focus.length<2){
       const extra=backgroundTarget(store,plan,new Set(focus.map(item=>item.word)));
       if(!extra)break;
@@ -80,10 +81,11 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
     const kind=entryKind('word',text);
     const {color,score}=strengthFor(store.db,kind,text);
     const before=score??0;
-    const after=Math.min(12,before+storyDifficulty[difficulty].points*plan.chapterCount);
+    const due=encounterFor(store.db,text).dueAt;
+    const after=due!==null && due<=Date.now()?before:Math.min(perfectScore,before+storyDifficulty[difficulty].points*plan.chapterCount);
     projected.set(text,after);
     const sense=catalog.get(kind,text)?.senses[0];
-    return {text,kind,color,gain:after-before,pinyin:sense?.pinyin,meaning:sense?.meaning};
+    return {text,kind,color,gain:Math.round((after-before)*1000)/1000,pinyin:sense?.pinyin,meaning:sense?.meaning};
   }
   const cards=focus.map(item=>{
     const word=estimate(item.word);

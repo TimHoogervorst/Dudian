@@ -1,9 +1,12 @@
 import {catalog} from './catalog.ts';
-import {recordedStrengths} from './strength.ts';
+import {reviewCandidates} from './strength.ts';
+import {perfectScore} from './encounters.ts';
 import {ensureActions} from './word-actions.ts';
 import {flashcardHistory} from './flashcards.ts';
 import type {ReadingStore} from './store.ts';
 import {ensureCompletions} from './completion.ts';
+import type {Difficulty} from './story-plan.ts';
+import {storyDifficulty} from './story-difficulty.ts';
 
 const day = 86_400_000;
 
@@ -32,16 +35,17 @@ function readingEvidence(store:ReadingStore) {
   return {seen,chapters:recent.length,comfortable:recent.length>=2 && aided/Math.max(1,encountered)<=0.15};
 }
 
-export function vocabularyFor(store:ReadingStore, ceiling:number, now:number, excluded:ReadonlySet<string>=new Set()) {
+export function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling:number, now:number, excluded:ReadonlySet<string>=new Set()) {
   const {db}=store;
-  const strengths=recordedStrengths(db);
+  const strengths=reviewCandidates(db,now);
   const attempts=flashcardHistory(db);
   ensureActions(db);
   const reading=readingEvidence(store);
   const marks=db.prepare("SELECT word,max(at) AS at FROM word_actions WHERE kind='difficulty' GROUP BY word").all();
   const lastMark=new Map(marks.map(row=>[String(row.word),Number(row.at)]));
+  const perfect=new Set(strengths.filter(i=>i.score===perfectScore).map(i=>i.text));
   const available=(word:string)=>!lastMark.has(word) || now-lastMark.get(word)!>=day;
-  const eligible=(word:string)=>available(word) && !excluded.has(word);
+  const eligible=(word:string)=>available(word) && !excluded.has(word) && !perfect.has(word);
   const knownWords=new Set(strengths.filter(i=>i.kind==='word'||catalog.isCurriculumWord(i.text)).map(i=>i.text));
   const knownCharacters=new Set(strengths.filter(i=>i.kind==='character').map(i=>i.text));
   const baseline=catalog.list('word',1);
@@ -55,16 +59,20 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number, ex
     const history=attemptsByItem.get(item.kind+'/'+item.text);
     const seen=reading.seen.get(word??'');
     return {...item,word,count:(history?.count??0)+(seen?.count??0),at:Math.max(history?.at??0,seen?.at??0,lastMark.get(word??'')??0)};
-  }).filter(item=>item.word && eligible(item.word));
+  }).filter(item=>item.score<perfectScore && item.word && !excluded.has(item.text) && eligible(item.word));
   const learning=candidates.filter(item=>item.score<6)
     .sort((a,b)=>a.score-b.score || a.count-b.count || a.at-b.at || a.text.localeCompare(b.text));
   const fallback=candidates.filter(item=>knownWords.has(item.text))
     .sort((a,b)=>a.at-b.at || a.count-b.count || a.text.localeCompare(b.text))[0];
   const reviews=learning.length ? [...new Set(learning.map(i=>i.word!))] : fallback ? [fallback.word!] : [];
   const difficult=new Set(candidates.filter(i=>i.score<0).map(i=>i.word));
-  const reviewWords=reviews.slice(0,3);
-  const slots=Math.max(0,ceiling-Math.min(ceiling,difficult.size));
-  const budget=difficult.size>=3 ? 0 : slots;
+  const due=candidates.filter(item=>item.dueAt<=now).sort((a,b)=>a.dueAt-b.dueAt)[0];
+  const hard=difficulty==='hard';
+  const focusLimit=storyDifficulty[difficulty].focusCards;
+  const priorityReviews=hard?reviews.filter(word=>difficult.has(word)):reviews;
+  const reviewWords=[...new Set([...(due?[due.word!]:[]),...priorityReviews])].slice(0,hard?focusLimit:3);
+  const budget=hard?Math.min(ceiling,focusLimit-reviewWords.length)
+    :difficult.size>=3?0:Math.max(0,ceiling-difficult.size);
   const common=['茶','水','家','人','书','好','看','吃','来','去'];
   const newCharacters:string[]=[], newWords:string[]=[];
   const addTarget=(text:string,word:string)=>{
@@ -99,14 +107,20 @@ export function vocabularyFor(store:ReadingStore, ceiling:number, now:number, ex
   }
   for (const {text:word} of baseline) {
     for (const char of word) {
-      if (newCharacters.length>=budget) break;
+      if (newCharacters.length>=budget || (hard && newWords.includes(word))) break;
       addTarget(char,word);
     }
     if (newCharacters.length>=budget) break;
   }
-  const compound=budget>0 && reading.comfortable ? nextBand.find(({text})=>
+  const roomForCompound=!hard || reviewWords.length+newWords.length<focusLimit;
+  const compound=roomForCompound && budget>0 && reading.comfortable ? nextBand.find(({text})=>
     [...text].length>1 && !allowedBackground.has(text) && eligible(text)
     && !newWords.includes(text) && [...text].every(c=>knownCharacters.has(c)))?.text : undefined;
+  if(hard){
+    const remaining=focusLimit-reviewWords.length-newWords.length-Number(Boolean(compound));
+    const extraReviews=reviews.filter(word=>!reviewWords.includes(word) && !newWords.includes(word) && word!==compound);
+    reviewWords.push(...extraReviews.slice(0,remaining));
+  }
   const reviewCharacters=candidates.filter(item=>item.kind==='character' && item.word && reviewWords.includes(item.word)).map(item=>item.text);
   const strongCharacters=strengths.filter(item=>item.kind==='character' && item.score>=6).length;
   return {background,newCharacters,newWords,reviewWords,reviewCharacters,compound,strongCharacters};

@@ -11,14 +11,14 @@ test('summary prioritizes targets, counts distinct net gains and preserves the c
   const words=['今天','天','我','去','看','你','她','茶','水'];
   store.saveStory({id:'gains',title:'Today',difficulty:'medium',preview:{characters:[{text:'水'}],review:[]},
     chapters:[0,1].map(i=>({title:String(i),paragraphs:[words.map(text=>({text}))]}))});
-  adjustStrength(store.db,'character','我',12);
+  adjustStrength(store.db,'character','我',36);
   finishChapter(store,'gains',0);
-  assert.equal(strengthFor(store.db,'character','水').score,2);
+  assert.equal(strengthFor(store.db,'character','水').score,null);
   assert.throws(()=>storySummary(store,'gains'),/Finish the story/);
   adjustStrength(store.db,'character','水',4); // Another activity between chapters.
   finishChapter(store,'gains',1);
   finishChapter(store,'gains',1);
-  assert.equal(strengthFor(store.db,'character','天').score,2);
+  assert.equal(strengthFor(store.db,'character','天').score,0.5);
   const gains=storySummary(store,'gains').characterGains;
   assert.equal(gains.highlights[0].text,'水');
   assert.equal(gains.highlights[0].points,4);
