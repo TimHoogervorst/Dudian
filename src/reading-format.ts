@@ -1,5 +1,5 @@
 import {messages,type ArticleKind} from './reading-types.ts';
-import {paragraphCounts,type StoryPlan} from './story-plan.ts';
+import {paragraphCounts,type Difficulty,type StoryPlan} from './story-plan.ts';
 
 const sections:Record<ArticleKind,readonly string[]>={
   'Notice':['notice'],
@@ -7,6 +7,10 @@ const sections:Record<ArticleKind,readonly string[]>={
   'Recipe':['ingredients','step'],
   'Short news report':['lead','report']
 };
+function letterSections(difficulty:Difficulty){
+  const bodies={easy:1,medium:2,hard:3}[difficulty];
+  return ['greeting',...Array<string>(bodies).fill('body'),'signature'];
+}
 export function formatRules(plan:StoryPlan){
   const format=plan.format;
   if(format?.type==='dialogue'){
@@ -18,7 +22,7 @@ export function formatRules(plan:StoryPlan){
   }
   if(format?.type==='article')return [
     'Write a collection of complete independent Mandarin documents. Honor the selected subject if supplied. Chapter documents in order: '+format.documents.join(', ')+'. Give each an English title identifying its subject.',
-    'Provide a sections array with one role per paragraph. Required roles in order for each format: '+JSON.stringify(sections)+'. Repeat roles as needed. Write concise actionable notices, complete letters with a greeting and signature, recipes with ingredients and ordered steps, or factual short reports with a lead and details.'
+    'Provide a sections array with one role per paragraph. Required roles in order for each format: '+JSON.stringify({...sections,Letter:letterSections(plan.difficulty)})+'. For letters use the exact sequence shown, one substantive body paragraph per body entry. For other formats repeat roles as needed. Write concise actionable notices, complete letters with a greeting and signature, recipes with ingredients and ordered steps, or factual short reports with a lead and details.'
   ].join('\n');
   if(format?.stage==='Baby book')return 'Write a very simple baby book. Each chapter has 4 to 8 pages. Each paragraph is one page with exactly one short sentence of at most 12 words. Use repetition and one concrete change per page. End each page after one sentence. Bāobāo may appear. Keep one narrative across all chapters.';
   const cast=!format||format.stage==='Children’s book';
@@ -27,8 +31,12 @@ export function formatRules(plan:StoryPlan){
     'Write approximately '+plan.targetWords+' word occurrences. Every chapter must have '+paragraphCounts[plan.difficulty].join(' to ')+' paragraphs. Aim for 40 segmented words per paragraph.'
   ].join('\n');
 }
-export function articleSectionsValid(kind:ArticleKind,roles:unknown,count:number):roles is string[]{
+export function articleSectionsValid(kind:ArticleKind,roles:unknown,count:number,difficulty:Difficulty):roles is string[]{
   if(!Array.isArray(roles)||roles.length!==count)return false;
+  if(kind==='Letter'){
+    const expected=letterSections(difficulty);
+    return count===expected.length && expected.every((role,i)=>roles[i]===role);
+  }
   const expected=sections[kind];
   const runs=roles.filter((role,i)=>i===0||roles[i-1]!==role);
   return runs.length===expected.length && runs.every((role,i)=>role===expected[i]);

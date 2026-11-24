@@ -110,8 +110,8 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
         throw new CandidateError('Provide exactly '+messages[plan.difficulty]+' messages and one speaker index per message, including each participant.',i);
       chapter.names=names;chapter.speakers=speakers;
     }else if(format?.type==='article'){
-      if(!articleSectionsValid(format.documents[i],raw.sections,chapter.paragraphs.length))
-        throw new CandidateError('Use the required section roles for '+format.documents[i]+', one per paragraph in document order.',i);
+      if(!articleSectionsValid(format.documents[i],raw.sections,chapter.paragraphs.length,plan.difficulty))
+        throw new CandidateError('Use the required section roles for '+format.documents[i]+', one per paragraph in document order. For a letter match the planned section sequence exactly.',i);
       chapter.sections=raw.sections;
     }else if(format?.stage==='Baby book'){
       if(chapter.paragraphs.length<4||chapter.paragraphs.length>8||chapter.paragraphs.some(p=>p.some(t=>t.sentence!==0)||p.filter(t=>t.entry||t.cast).length>12))

@@ -5,7 +5,7 @@ The learner chooses Book, Article, or Dialogue. The app uses their dashboard HSK
 | Reading type | Entry point | As HSK progress grows | Later candidates |
 | --- | --- | --- | --- |
 | Book | Below 0.2, a baby book with one short sentence per page and a repeated pattern. | At 0.2, move to the Bāobāo children’s book. At 2.0, move to a chapter book with a plot that carries across scenes. | Young-adult fiction and longer novels. |
-| Article | A notice with one actionable fact, such as a shop’s opening time. | Add everyday letters at 0.5, recipes at 1.0, and short news reports at 2.0. Notices and other earlier formats stay in the pool. | Science explainers and specialist articles. |
+| Article | A notice with one actionable fact, such as a shop’s opening time. | Letters replace notices at 0.5. Add recipes at 1.0 and short news reports at 2.0. | Science explainers and specialist articles. |
 | Dialogue | A two-person exchange. | Allow up to three people at 1.0, four at 2.0, and five at 3.0. The count includes the learner’s character. Two-person chats stay eligible throughout. Group chats can include delayed replies to earlier messages. | — |
 
 ## Progression tab
@@ -59,7 +59,7 @@ Generate one Introduction image per session. Use the same visual direction for a
 These examples propose how the reader and comprehension checks could work together.
 
 - **Book.** In a baby book, Bāobāo looks for a cup. Each page changes one detail. A check after several pages asks where he finally finds it. In a chapter book, the missing cup could set up a misunderstanding that resolves in a later scene.
-- **Article.** A notice has a heading and a brief message. A letter shows who wrote it, who received it, and what the recipient needs to do. A recipe has an ingredient list and ordered steps. A short report opens with a headline and tells what happened. Each check draws on the document’s purpose, such as choosing what to add after the water boils.
+- **Article.** A notice has a heading and a brief message. Each letter has a greeting and signature around one body paragraph on Easy, two on Medium, or three on Hard. It shows who wrote it, who received it, and what the recipient needs to do. A recipe has an ingredient list and ordered steps. A short report opens with a headline and tells what happened. Each check draws on the document’s purpose, such as choosing what to add after the water boils.
 - **Dialogue.** Show messages in the order sent with stable speaker names. Use short turns, familiar forms of address, and details speakers can leave implicit in context. In a family chat, one person asks who is bringing dinner, another changes the meeting time, and a third responds to the dinner question. A check could ask who agreed to bring dinner. The text or a visible reply reference should give the learner enough evidence to answer.
 
 ## Word interactions

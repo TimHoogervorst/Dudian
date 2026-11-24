@@ -20,7 +20,7 @@ A single written Chinese symbol, such as 东. Its Library entry links to words t
 The opening page of a reading session. It presents the cover illustration, teaser, chapters, and vocabulary preview before the learner starts reading.
 
 **Word**  
-A vocabulary entry made up of one or more characters, such as 东西. A word can be looked up in a story and practiced as a whole flashcard.
+A vocabulary entry made up of one or more characters, such as 东西. A word can be looked up in a story and practiced as a whole.
 
 **Cast member**
 
@@ -70,3 +70,15 @@ A short set of multiple-choice questions the learner answers at the end of a cha
 
 **Flashcard review**  
 A practice attempt in which the learner recalls the pronunciation and meaning of the displayed Chinese, reveals the answer, and assesses their recall.
+
+**Library practice exercise**
+
+A short task that tests the learner on one or more characters or words. Choosing the English meaning of 水 is one exercise, as is matching five Chinese entries to their English meanings.
+
+**Practice target**
+
+A character or word whose reading strength is assessed in a Library practice exercise. Each pair in a matching exercise has its own practice target.
+
+**Matching exercise**
+
+A Library practice exercise in which the learner pairs Chinese entries with their English meanings and submits the whole set with one check. Each Chinese entry receives its own result based on the meaning paired with it at submission.

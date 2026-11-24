@@ -21,7 +21,8 @@ export function readingOptions(level:number,previous?:number){
   return {stage,people};
 }
 export function articleDocuments(level:number,count:number):ArticleKind[]{
-  const eligible=milestones.article.filter(([,n])=>level>=n).map(([name])=>name);
+  const unlocked=milestones.article.filter(([,n])=>level>=n).map(([name])=>name);
+  const eligible=unlocked.includes('Letter')?unlocked.filter(kind=>kind!=='Notice'):unlocked;
   const documents:ArticleKind[]=[];
   let pool:ArticleKind[]=[];
   while(documents.length<count){

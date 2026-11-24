@@ -1,3 +1,4 @@
+import {articleSectionsValid} from '../src/reading-format.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {ReadingStore} from '../src/store.ts';
@@ -12,8 +13,19 @@ test('milestones, book stages and document pools agree at inclusive boundaries',
     assert.equal(cards.filter(card=>card.unlocked).length,unlocked);
     assert.equal(cards.find(card=>card.current)?.label,readingOptions(level).stage);
   }
-  assert.deepEqual(new Set(articleDocuments(1,3)),new Set(['Notice','Letter','Recipe']));
-  assert.deepEqual(articleDocuments(0,2),['Notice','Notice']);
+  assert.deepEqual(new Set(articleDocuments(1,2)),new Set(['Letter','Recipe']));
+  assert.deepEqual(articleDocuments(0.499,2),['Notice','Notice']);
+  assert.deepEqual(articleDocuments(0.5,2),['Letter','Letter']);
+  assert.deepEqual(new Set(articleDocuments(2,3)),new Set(['Letter','Recipe','Short news report']));
+});
+
+test('letters require one greeting, the selected number of body paragraphs, and one signature',()=>{
+  for(const difficulty of ['easy','medium','hard'] as const){
+    for(const count of [1,2,3]){
+      const roles=['greeting',...Array(count).fill('body'),'signature'];
+      assert.equal(articleSectionsValid('Letter',roles,roles.length,difficulty),count==={easy:1,medium:2,hard:3}[difficulty]);
+    }
+  }
 });
 
 test('the preview pins the participant count and supports an open subject',t=>{
