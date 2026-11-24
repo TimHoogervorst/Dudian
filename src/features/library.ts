@@ -23,13 +23,14 @@ export default async function library({req,url,store,json,body}: Context) {
     return true;
   }
   if (text !== null) {
-    const item = catalog.get(entryKind(kind,text), text, url.searchParams.get('sense') ?? undefined);
+    const primary=catalog.studySense(text);
+    const item = catalog.get(entryKind(kind,text), text, url.searchParams.get('sense') ?? primary?.id);
     if (!item) throw new HttpError(404, 'Dictionary entry unavailable.');
     const examples = item.examples.map(word => {
-      const firstSense = catalog.get('word',word.text)?.senses[0];
+      const firstSense = catalog.studySense(word.text);
       return {...word,meaning:firstSense?.meaning,sense:firstSense?.id};
     });
-    json(200,{...item,examples,...strengthFor(store.db,kind,text),lastSeen:encounterFor(store.db,text).lastSeen});
+    json(200,{...item,primarySense:primary?.id,examples,...strengthFor(store.db,kind,text),lastSeen:encounterFor(store.db,text).lastSeen});
     return true;
   }
 
@@ -47,15 +48,16 @@ export default async function library({req,url,store,json,body}: Context) {
   const list=color?levelItems.filter(item=>strengthFor(store.db,kind,item.text).color===color):levelItems;
   const matches: (CatalogItem & {match?:Sense})[] = query ? list.flatMap(item => {
     const senses = catalog.get(kind,item.text)?.senses ?? [];
-    const sense = item.text.includes(query) ? senses[0] : senses.find(s =>
-      s.meaning.toLowerCase().includes(query) || (sound && plainPinyin(s.pinyin).includes(sound)));
+    const primary=catalog.studySense(item.text);
+    const matchesQuery=(s:Sense)=>s.meaning.toLowerCase().includes(query)||Boolean(sound&&plainPinyin(s.pinyin).includes(sound));
+    const sense = item.text.includes(query)||(primary&&matchesQuery(primary)) ? primary : senses.find(matchesQuery);
     return sense ? [{...item,match:sense}] : [];
   }) : list;
   const pages = Math.max(1,Math.ceil(matches.length/pageSize));
   const page = Math.min(pages,requestedPage);
   const items = matches.slice((page-1)*pageSize,page*pageSize).map(({match,...item}) => {
-    const first = match ?? catalog.get(kind,item.text)?.senses[0];
-    return {...item,pinyin:first?.pinyin,meaning:first?.meaning,...strengthFor(store.db,kind,item.text)};
+    const first = match ?? catalog.studySense(item.text);
+    return {...item,pinyin:first?.pinyin,meaning:first?.meaning,sense:match?.id,...strengthFor(store.db,kind,item.text)};
   });
   json(200,{items,total:matches.length,page,pages});
   return true;

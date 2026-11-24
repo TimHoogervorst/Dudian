@@ -60,6 +60,11 @@ main:has(.lib-controls){padding:clamp(14px,2vw,26px) clamp(16px,2.8vw,44px) 5rem
 .lib-entry h2 {font-size:1.55rem;margin:1.4rem 0 .5rem}
 .lib-reading ul {list-style-position:inside;padding:0;max-width:32rem;margin:0 auto;line-height:1.65}
 .lib-reading li::marker {color:#ab7b54;font-size:.75em}
+.lib-primary-reading {grid-column:1/-1}
+.lib-primary-reading strong {font-size:1.55rem;color:var(--red)}
+.lib-primary-reading p {margin:.35rem 0 0}
+.lib-other-readings {margin:1.2rem 0}
+.lib-other-readings summary {cursor:pointer;color:var(--red)}
 .lib-pieces {justify-content:center}.lib-pieces a {padding:8px 14px}
 .lib-examples {max-width:32rem;list-style:none;margin:.75rem auto 0;padding:0;text-align:left}
 .lib-examples li {border-top:1px solid var(--line)}

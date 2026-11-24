@@ -48,7 +48,7 @@ export function setStrength(db:DatabaseSync,kind:ItemKind,text:string,color:keyo
       db.prepare('DELETE FROM item_encounters WHERE text=?').run(text);
     }
     else db.prepare('INSERT INTO reading_strength VALUES(?,?,?) ON CONFLICT(kind,text) DO UPDATE SET score=excluded.score').run(kind,text,score);
-    if(score!==null)seeItem(db,text,Date.now(),true);
+    if(score!==null)seeItem(db,text,Date.now(),true,false);
     return score;
   });
 }
@@ -108,4 +108,23 @@ export function hskReadingProgress(db:DatabaseSync, projected=new Map<string,num
   }
   return curriculumBands.reduce((sum,band,i)=>
     sum+earned[i]/((band.character.size+band.word.size)*statusScores.green),0);
+}
+
+// Recover thresholds crossed between visits, including on an upgraded database.
+export function reachedLevel(db:DatabaseSync,current:number){
+  const state=db.prepare('SELECT reached,last_change FROM milestone_progress WHERE id=1').get()!;
+  let peak=current, cursor=current, last=Number(state.last_change);
+  for(const row of db.prepare('SELECT rowid,* FROM score_changes WHERE rowid>? ORDER BY rowid DESC').iterate(last)){
+    last=Math.max(last,Number(row.rowid));
+    const kind=row.kind as ItemKind;
+    const band=curriculumBands.find(b=>b[kind].has(String(row.text)));
+    if(!band)continue;
+    const credit=(score:number)=>Math.max(0,Math.min(statusScores.green,score));
+    cursor+=(credit(Number(row.before_score))-credit(Number(row.after_score)))/
+      ((band.character.size+band.word.size)*statusScores.green);
+    peak=Math.max(peak,cursor);
+  }
+  const reached=Math.max(Number(state.reached),Math.min(6,Math.floor(peak+1e-10)));
+  db.prepare('UPDATE milestone_progress SET reached=max(reached,?),last_change=max(last_change,?) WHERE id=1').run(reached,last);
+  return reached;
 }

@@ -56,6 +56,17 @@ export class ReadingStore {
         DELETE FROM reading_strength WHERE kind='word' AND length(text)=1;`);
       if(exists.get('flashcard_reviews'))this.db.exec("UPDATE flashcard_reviews SET kind='character' WHERE kind='word' AND length(text)=1");
       migrateEncounters(this.db);
+      if(!exists.get('milestone_characters')){
+        this.db.exec(`CREATE TABLE milestone_characters(text TEXT PRIMARY KEY);
+          CREATE TABLE milestone_progress(id INTEGER PRIMARY KEY, reached INTEGER NOT NULL, last_change INTEGER NOT NULL);
+          INSERT INTO milestone_progress VALUES(1,0,0);
+          CREATE TABLE milestone_tests(id TEXT PRIMARY KEY, level INTEGER NOT NULL, status TEXT NOT NULL,
+            sections TEXT NOT NULL, answers TEXT NOT NULL DEFAULT '[]', mistakes INTEGER NOT NULL DEFAULT 0);
+          CREATE UNIQUE INDEX milestone_active ON milestone_tests(level) WHERE status IN ('ready','active','passed')`);
+        const insert=this.db.prepare('INSERT OR IGNORE INTO milestone_characters VALUES(?)');
+        for(const row of this.db.prepare('SELECT text FROM item_encounters').all())
+          for(const char of String(row.text))if(/\p{Script=Han}/u.test(char))insert.run(char);
+      }
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }

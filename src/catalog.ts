@@ -9,6 +9,7 @@ export function entryKind(kind:ItemKind,text:string):ItemKind {
 export interface CatalogItem { text: string; level: number }
 const data = (name: string) => readFileSync(new URL('../data/' + name, import.meta.url));
 const curriculum: string[][] = JSON.parse(data('hsk.json').toString('utf8'));
+const studySenseIds:Record<string,string> = JSON.parse(data('hsk1-study-senses.json').toString('utf8'));
 
 const words = curriculum.flatMap((forms, index) => forms.map(text => ({text, level: index + 1})));
 const levels = new Map<string, number>();
@@ -75,6 +76,13 @@ function dictionarySenses(text: string): Sense[] {
 }
 
 export const catalog = {
+  studySense(text:string){
+    const senses=dictionarySenses(text);
+    const id=studySenseIds[text];
+    if(id)return senses.find(s=>s.id===id);
+    return senses.find(s=>s.pinyin===s.pinyin.toLowerCase()&&!/\p{Script=Han}/u.test(s.meaning)&&
+      !/^(?:surname |(?:old )?variant of |classifier for |see |used in )|ethnic group|\barchaic\b/i.test(s.meaning))??senses[0];
+  },
   wordLevel(text:string){return wordLevels.get(text);},
   isCurriculumWord(text:string){return wordLevels.has(text);},
   libraryItems(kind:ItemKind,level:number){

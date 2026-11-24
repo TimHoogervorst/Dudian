@@ -1,9 +1,9 @@
-import {el} from './ui.js';
+import {el,link,api,ui} from './ui.js';
 export function displayLevel(level){
   return level>0 && level<0.01?'<0.01':String(Math.floor(level*100)/100);
 }
-export function readingProgress(level,projected){
-  const start=Math.min(5,Math.floor(level));
+export function readingProgress(level,projected,state={}){
+  const start=state.milestone?Math.min(Math.floor(level),state.milestone-1):Math.min(5,Math.floor(level));
   const milestone=start+1;
   const panel=el('section',null,'hsk-progress');
   const heading=el('div',null,'hsk-progress-heading');
@@ -20,7 +20,30 @@ export function readingProgress(level,projected){
   for(const i of [start,milestone]){
     const tick=el('span',String(i));tick.style.left=(i-start)*100+'%';labels.append(tick);
   }
-  panel.append(heading,track,labels,el('p',level>=6?'HSK 6 reached':'Next milestone: HSK '+milestone,'hsk-milestone'));
+  panel.append(heading,track,labels);
+  if(state.passed)panel.append(el('p','HSK '+state.passed+' passed','hsk-milestone'));
+  if(state.milestone){
+    panel.append(el('p','HSK '+state.milestone+' milestone reached','hsk-milestone'));
+    const missing=state.missing.length,attempt=state.attempt;
+    if(attempt&&attempt.status!=='failed'){
+      panel.append(link(attempt.status==='ready'?'Start test':'Continue test','#/milestone/'+attempt.id,'button'));
+    }else{
+      const label=missing?'Practice '+missing+' unseen character'+(missing===1?'':'s'):attempt?'Generate new test':'Generate test';
+      const action=el('button',label,'button');
+      action.onclick=async()=>{
+        action.disabled=true;
+        action.textContent=missing?'Preparing practice…':'Generating test…';
+        try{
+          const result=missing?await api('/api/practice/sets',{kind:'character',level:state.milestone,words:state.missing}):
+            await api('/api/milestone-tests',{level:state.milestone});
+          if(action.isConnected)ui.navigate((missing?'/exercises/':'/milestone/')+result.id);
+        }catch(error){ui.notice(error.message);}
+        finally{action.disabled=false;action.textContent=label;}
+      };
+      panel.append(action);
+      if(attempt)panel.append(link('Review last attempt','#/milestone/'+attempt.id,'text-link'));
+    }
+  }else if(level<6)panel.append(el('p','Next milestone: HSK '+milestone,'hsk-milestone'));
   if(projected!==undefined){
     const gain=Math.max(0,projected-level);
     const delta=gain>0 && gain<0.0001?'<0.0001':Number(gain.toFixed(4));

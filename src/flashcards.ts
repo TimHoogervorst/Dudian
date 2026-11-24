@@ -7,13 +7,13 @@ import {perfectScore,seeItem} from './encounters.ts';
 
 type DeckRequest = {kind: ItemKind|'mixed'; level?: number; words?: string[]};
 export function flashcardHistory(db: DatabaseSync) {
-  ensureSchema(db);
+  ensureReviewSchema(db);
   return db.prepare(`SELECT kind,text,count(*) AS count,max(graded_at) AS at
     FROM flashcard_reviews GROUP BY kind,text`).all().map(r=>({
       kind:r.kind as ItemKind,text:String(r.text),count:Number(r.count),at:Number(r.at),
     }));
 }
-function ensureSchema(db: DatabaseSync) {
+export function ensureReviewSchema(db: DatabaseSync) {
   db.exec(`CREATE TABLE IF NOT EXISTS flashcard_sessions(
     id TEXT PRIMARY KEY, kind TEXT NOT NULL, deck TEXT NOT NULL, cursor INTEGER NOT NULL DEFAULT 0
   );
@@ -80,14 +80,14 @@ function chooseDeck(db: DatabaseSync, {kind,level=1,words}: DeckRequest):string[
   return [...new Set([...(due?[due]:[]),...first,...remaining])].slice(0,10).sort((a,b)=>a.shuffle-b.shuffle).map(i=>i.text);
 }
 export function startSession(db: DatabaseSync, request: DeckRequest) {
-  ensureSchema(db);
+  ensureReviewSchema(db);
   const deck = chooseDeck(db,request);
   const id = randomUUID();
   db.prepare('INSERT INTO flashcard_sessions(id,kind,deck) VALUES(?,?,?)').run(id,request.kind,JSON.stringify(deck));
   return readSession(db,id);
 }
 export function readSession(db: DatabaseSync,id: string) {
-  ensureSchema(db);
+  ensureReviewSchema(db);
   const row = db.prepare('SELECT kind,deck,cursor FROM flashcard_sessions WHERE id=?').get(id);
   if (!row) throw new HttpError(404,'Review session not found.');
   const kind = row.kind as DeckRequest['kind'];
@@ -103,6 +103,25 @@ export function readSession(db: DatabaseSync,id: string) {
   return {id,kind,index,total:deck.length,results,card:entry ? {kind:cardKind,text:entry.text,senses:entry.senses} : null};
 }
 
+function gradeRecall(db:DatabaseSync,kind:ItemKind,text:string,grade:string,now:number,day:Intl.DateTimeFormat){
+  const previous = db.prepare('SELECT MAX(graded_at) AS last FROM flashcard_reviews WHERE kind=? AND text=?').get(kind,text);
+  const first = previous?.last == null;
+  const anotherDay = !first && day.format(now)>day.format(Number(previous.last));
+  const strength = strengthFor(db,kind,text);
+  let delta: number;
+  if (grade==='correct') delta = anotherDay ? 4 : first ? 3 : 2;
+  else if (grade==='incorrect') delta = -3;
+  else delta = strength.score===null || strength.score<0 ? 1 : strength.score>=6 ? -1 : 0;
+  const after=scoreEncounter(db,kind,text,delta,now,grade==='almost'?'assisted':grade==='correct'?'correct':'incorrect');
+  return (after.score??0)-(strength.score??0);
+}
+
+export function recordReview(db:DatabaseSync,id:string,index:number,kind:ItemKind,text:string,grade:string,now:number,change:number){
+  if(kind==='word')for(const char of new Set(text))seeItem(db,char,now);
+  const points=Math.round(change*1000)/1000;
+  db.prepare('INSERT INTO flashcard_reviews(session_id,card_index,kind,text,grade,graded_at,points) VALUES(?,?,?,?,?,?,?)').run(id,index,kind,text,grade,now,points);
+}
+
 export function gradeCard(db: DatabaseSync,id: string,index: number,grade: string,now=Date.now(),zone='UTC') {
   if (!['incorrect','almost','correct'].includes(grade) || !Number.isInteger(index) || index<0) {
     throw new HttpError(400,'Choose a recall grade for the displayed card.');
@@ -112,24 +131,14 @@ export function gradeCard(db: DatabaseSync,id: string,index: number,grade: strin
     if(typeof zone!=='string')throw new RangeError();
     day=new Intl.DateTimeFormat('sv-SE',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'});
   } catch { throw new HttpError(400,'Unknown time zone.'); }
-  ensureSchema(db);
+  ensureReviewSchema(db);
   db.exec('BEGIN IMMEDIATE');
   try {
     const session = readSession(db,id);
     if (session.index===index && session.card) {
       const {kind,text}=session.card;
-      const previous = db.prepare('SELECT MAX(graded_at) AS last FROM flashcard_reviews WHERE kind=? AND text=?').get(kind,text);
-      const first = previous?.last == null;
-      const anotherDay = !first && day.format(now)>day.format(Number(previous.last));
-      const strength = strengthFor(db,kind,text);
-      let delta: number;
-      if (grade==='correct') delta = anotherDay ? 4 : first ? 3 : 2;
-      else if (grade==='incorrect') delta = -3;
-      else delta = strength.score===null || strength.score<0 ? 1 : strength.score>=6 ? -1 : 0;
-      const after=scoreEncounter(db,kind,text,delta,now,grade==='almost'?'assisted':grade==='correct'?'correct':'incorrect');
-      if(kind==='word')for(const char of new Set(text))seeItem(db,char,now);
-      const points=Math.round(((after.score??0)-(strength.score??0))*1000)/1000;
-      db.prepare('INSERT INTO flashcard_reviews(session_id,card_index,kind,text,grade,graded_at,points) VALUES(?,?,?,?,?,?,?)').run(id,index,kind,text,grade,now,points);
+      const change=gradeRecall(db,kind,text,grade,now,day);
+      recordReview(db,id,index,kind,text,grade,now,change);
       db.prepare('UPDATE flashcard_sessions SET cursor=cursor+1 WHERE id=?').run(id);
     } else {
       const existing = db.prepare('SELECT grade FROM flashcard_reviews WHERE session_id=? AND card_index=?').get(id,index);

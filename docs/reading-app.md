@@ -45,7 +45,7 @@ Assign each character to the earliest curriculum level containing a word that us
 
 A difficulty mark records the occurrence in usage history and queues its penalty for story completion. A lookup excludes the affected vocabulary from unaided appearance credit. Each completed chapter saves its base points. The final chapter applies the story multiplier and posts the award to the Library. [Story scoring](reading-strength.md)
 
-Group material under HSK levels 1–6. Use green for strong reading knowledge, yellow for uncertain, red for struggling, and gray for unseen. Mix strong items with weaker items in flashcard practice. Reveal pronunciation and meaning on request. Support self-assessment as correct, almost, or incorrect, with right, down, or left swipes respectively.
+Group material under HSK levels 1–6. Use green for strong reading knowledge, yellow for uncertain, red for struggling, and gray for unseen. Library Practice opens a set of ten exercises at the selected level, mixing characters and words with priority for weak and overdue entries. Choose an English meaning or match up to five entries to their meanings. Show pinyin with each entry and grade each target once. A matching board submits all pairs together. After a set, offer another set when fresh overdue targets remain.
 
 Completing a chapter containing a compound records an encounter with its component characters. A character’s first such encounter moves it from gray to yellow. Reading the character as a standalone word or reviewing its character flashcard builds evidence of independent recognition.
 
@@ -65,7 +65,7 @@ Show one circle per day in the weekly reading view. Fully color a day when the l
 
 A day qualifies for light fill when the learner advances to another paragraph, checks a word, marks a difficulty, or spends one active minute in the reader. Opening and immediately closing a story leaves the day empty. Show one numeric summary for the week, the number of stories finished. The circles convey daily activity.
 
-At story completion, show each explicitly marked word alongside the sentence where the learner marked it. Offer Practice these words when there are marked words. This learner-initiated flashcard session is available immediately. Collect the optional thumbs-up or thumbs-down story rating separately.
+At story completion, show each explicitly marked word alongside the sentence where the learner marked it. Offer Practice these words when there are marked words. These words are immediately available for meaning-choice and matching exercises. Collect the optional thumbs-up or thumbs-down story rating separately.
 
 The supplied illustrations establish the warm paper palette, deep red controls, and responsive chapter layout. The desktop reference places the chapter list beside the reading column and opens a dictionary alongside it. Generate the text first. Artwork and audio in the references are outside the current reading discussion.
 

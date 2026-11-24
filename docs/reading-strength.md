@@ -2,6 +2,8 @@
 
 ## Practice scoring
 
+Library Practice changes reading strength by +0.5 for a correct answer and −0.5 for a miss, within the existing score limits. Each matching pair is scored separately. The same half-point rule applies when the item is overdue, and either answer settles its review.
+
 The planner selects up to two focus cards on Easy, three on Medium and six on Hard. The story cover presents one Character focus list, ordered by priority. Each character or whole word uses its highest applicable tier.
 
 | Story tier | Easy | Medium | Hard |
@@ -33,7 +35,8 @@ After seven days away, an item becomes due. Further incidental encounters update
 
 | Overdue outcome | Score change | Review state |
 |---|---|---|
-| Unaided correct answer | 0 | Settled |
+| Library Practice choice or matching pair | +0.5 correct, −0.5 incorrect, within score limits | Settled |
+| Other unaided correct answer | 0 | Settled |
 | Incorrect Library flashcard or explicit difficulty mark | −6, bounded by the score floor | Settled |
 | Incorrect direct test of a strong or medium item | −2, bounded by the score floor | Settled |
 | Almost, correct after revealing English, or skipped | 0 | Still due |

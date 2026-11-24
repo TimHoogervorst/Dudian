@@ -126,7 +126,7 @@ export function setup(ui) {
     }
     hero.append(copy);
     const stats=el('div',null,'dashboard-stats');
-    stats.append(el('section',null,'home-week'),readingProgress(progress.level));
+    stats.append(el('section',null,'home-week'),readingProgress(progress.level,undefined,progress));
     overview.append(hero,stats);
     const shelf=el('section');
     const bar=el('header',null,'shelf-heading');

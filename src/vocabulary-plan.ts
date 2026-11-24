@@ -7,6 +7,7 @@ import type {ReadingStore} from './store.ts';
 import {ensureCompletions} from './completion.ts';
 import type {Difficulty} from './story-plan.ts';
 import {storyDifficulty} from './story-difficulty.ts';
+import {nextTestLevel,unseenCharacters} from './milestone-progress.ts';
 
 const day = 86_400_000;
 
@@ -101,6 +102,13 @@ export function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling
     }
   }
   const favored=[...new Set([...common,...baseline.map(i=>i.text)])];
+  const targetLevel=nextTestLevel(db);
+  const missing=new Set(unseenCharacters(db,targetLevel));
+  for(const word of [...common,...catalog.list('word',targetLevel).map(item=>item.text)]){
+    if(newCharacters.length>=budget)break;
+    const character=[...word].find(c=>missing.has(c)&&!newCharacters.includes(c));
+    if(character)addTarget(character,word);
+  }
   for (const word of favored) {
     if (newCharacters.length>=budget) break;
     if ([...word].length===1) addTarget(word,word);

@@ -82,3 +82,11 @@ A character or word whose reading strength is assessed in a Library practice exe
 **Matching exercise**
 
 A Library practice exercise in which the learner pairs Chinese entries with their English meanings and submits the whole set with one check. Each Chinese entry receives its own result based on the meaning paired with it at submission.
+
+**Milestone test**
+
+A generated assessment available once a learner has reached a whole HSK level and encountered every character assigned to it. Passing it allows the progress bar to advance beyond that level.
+
+**Test section**
+
+One part of a milestone test. A reading section contains a Book passage, Article, or Dialogue with a comprehension check. A word-practice section contains vocabulary exercises.

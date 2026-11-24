@@ -16,3 +16,41 @@
 .recall-example-button span{font-family:"Songti SC","SimSun",serif}
 .recall-example{font-size:1.4rem;line-height:1.6;margin:0 0 1.2rem}
 .recall-example mark{background:#f5d68e;color:var(--ink);border-radius:.2em}
+.practice-exercise{padding:clamp(16px,4vw,36px)}
+.practice-progress{appearance:none;display:block;width:min(100%,15rem);height:5px;margin:0 auto 1rem;border:0;border-radius:5px;overflow:hidden;background:#dedede;color:var(--red)}
+.practice-progress::-webkit-progress-bar{background:#dedede}
+.practice-progress::-webkit-progress-value{background:var(--red)}
+.practice-progress::-moz-progress-bar{background:var(--red)}
+.practice-controls{border:0;margin:0;padding:0;min-width:0}
+.practice-exercise h1{margin:.4rem 0 1.25rem;font-size:clamp(25px,2.6vw,42px)}
+.practice-reading{display:grid;gap:.2rem}
+.practice-glyph{font:500 2rem "Songti SC","SimSun",serif}
+.practice-controls>.practice-reading .practice-glyph{font-size:clamp(3.5rem,12vw,6rem)}
+.practice-controls button[hidden]{display:none}
+.practice-options,.practice-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin:1.3rem 0}
+.practice-options button,.meaning-card{white-space:normal;overflow-wrap:anywhere;min-height:48px}
+.practice-board{grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:clamp(.6rem,3vw,1.6rem);align-items:start}
+.practice-bank,.practice-pairs{display:grid;gap:.6rem;min-width:0}
+.practice-pair{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:.45rem;align-items:stretch}
+.practice-pair .practice-reading{align-content:center;overflow-wrap:anywhere}
+.practice-pair .recall-pinyin{font-size:.9rem;margin:0}
+.practice-slot,.meaning-home{border-radius:10px;min-width:0;display:grid;align-content:stretch}
+.practice-slot{background:#f4e7c8;border:1px dashed #af9161;padding:3px;box-shadow:inset 0 2px 4px #6e4b1617;min-height:3.6rem}
+.practice-slot.over{background:#ffe19a;outline:2px solid #997034}
+.practice-slot.over .empty-slot{visibility:hidden}
+.empty-slot{border:0;background:transparent;box-shadow:none;color:#806338;font-size:1.25rem}
+.meaning-home{min-height:3.6rem}
+.meaning-card{background:#fffcf4;border:1px solid #c5af89;border-bottom-width:3px;border-radius:8px;width:100%;padding:.5rem;line-height:1.25;touch-action:none;cursor:grab}
+.meaning-card[aria-pressed=true]{outline:2px solid var(--red);outline-offset:1px}
+.drag-preview{position:fixed;z-index:20;pointer-events:none;transform:translate(-50%,-50%) rotate(-3deg);box-shadow:0 5px 12px #0002}
+.practice-controls button[data-result]{opacity:1}
+.practice-controls [data-result=correct]{background:#dcebd9;color:#244d33;border-color:#759876}
+.practice-controls [data-result=miss]{background:#f3e5de;color:#73443a;border-color:#c69b8d}
+.practice-controls [data-result=answer],.match-correction{background:#ffe198;color:#573e0e;border-color:#b88c3c}
+.match-correction{border-radius:5px;font-size:.9rem;overflow-wrap:anywhere;padding:.3rem}
+.practice-status{min-height:1.3em;margin:.3rem 0 0;font-weight:600}
+@media(prefers-reduced-motion:no-preference){
+  [data-result=correct] .practice-mark{display:inline-block;animation:practice-check .38s ease-out}
+  @keyframes practice-check{0%{transform:scale(.3)}65%{transform:scale(1.35)}100%{transform:scale(1)}}
+}
+.page-exercises .summary-character{min-width:0;overflow-wrap:anywhere}

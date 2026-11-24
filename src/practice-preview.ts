@@ -5,6 +5,7 @@ import {catalog,entryKind} from './catalog.ts';
 import {buildPlan,chapterCounts,difficulties,validLength,type Difficulty,type StoryLength,type StoryPlan} from './story-plan.ts';
 import {storyDifficulty} from './story-difficulty.ts';
 import {strengthFor,hskReadingProgress} from './strength.ts';
+import {milestoneProgress} from './milestone-progress.ts';
 import {HttpError,type ReadingStore} from './store.ts';
 
 import {suggestSubjects,type Subject} from './practice-subjects.ts';
@@ -112,5 +113,6 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
   else if(type==='dialogue')plan.format={type,people:optionsForType.people};
   else throw new HttpError(400,'Unknown reading type.');
   cache.set(id,{options:optionsForType,plan,focus,subjects,excluded:[...excluded]});drafts.set(store,cache);
-  return {id,options:optionsForType,cards,subjects,level,projected:hskReadingProgress(store.db,projected)};
+  const progress=milestoneProgress(store.db,level);
+  return {id,options:optionsForType,cards,subjects,...progress,projected:Math.min(progress.passed+1,hskReadingProgress(store.db,projected))};
 }

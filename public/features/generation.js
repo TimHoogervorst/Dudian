@@ -126,7 +126,7 @@ export function setup(ui) {
           input.parentElement.querySelector('small').textContent=hints[input.value];
         }
         preview=next;
-        progress.replaceChildren(readingProgress(next.level,next.projected));
+        progress.replaceChildren(readingProgress(next.level,next.projected,next));
         const previousIndex=reroll?[...cards.children].findIndex(card=>card.dataset.word===reroll):-1;
         cards.replaceChildren(...next.cards.map(item=>{
           const card=el('article',null,'focus-card');

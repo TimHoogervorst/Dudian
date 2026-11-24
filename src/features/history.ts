@@ -1,7 +1,7 @@
 import {learningProgress} from '../learning-progress.ts';
 import {history,openStory} from '../history.ts';
 import type {Context} from '../server.ts';
-import {hskReadingProgress} from '../strength.ts';
+import {milestoneProgress} from '../milestone-progress.ts';
 
 export default function historyRoutes({req,url,store,json}:Context) {
   if(req.method==='GET'&&url.pathname==='/api/learning-progress'){
@@ -9,7 +9,7 @@ export default function historyRoutes({req,url,store,json}:Context) {
     return true;
   }
   if(req.method==='GET'&&url.pathname==='/api/reading-progress'){
-    json(200,{level:hskReadingProgress(store.db)});
+    json(200,milestoneProgress(store.db));
     return true;
   }
   if(req.method==='GET'&&url.pathname==='/api/history') {

@@ -56,7 +56,7 @@ async function renderList(root, kind, level, page, size, query, filter,signal) {
   summary.append(legend);
   const grid = el('div',null,'lib-grid');
   function tileFor(item) {
-    const tile = link('',detail(kind,item.text),'lib-tile lib-'+item.color);
+    const tile = link('',detail(kind,item.text,item.sense),'lib-tile lib-'+item.color);
     tile.title = item.meaning;
     tile.setAttribute('aria-label',item.text+' · '+item.pinyin+' · '+labels[item.color]);
     tile.append(el('strong',item.text),el('span',item.pinyin));
@@ -137,7 +137,8 @@ async function renderDetail(root,kind,text,sense) {
   const query = new URLSearchParams({kind,text});
   if (sense) query.set('sense',sense);
   const item = await api('/api/library?'+query);
-  const current = item.senses.find(s=>s.id===sense) ?? item.senses[0];
+  const primary = item.senses.find(s=>s.id===item.primarySense) ?? item.senses[0];
+  const current = item.senses.find(s=>s.id===sense) ?? primary;
   const entry = el('article',null,'lib-entry');
   const header = el('header');
   const headword = el('h1',text);
@@ -171,13 +172,20 @@ async function renderDetail(root,kind,text,sense) {
   };
   badge.append(select);
   header.append(el('p',labelFor(kind)+(item.level ? ' · HSK '+item.level : ''),'overline'),badge,headword);
+  const mainReading=el('div',null,'lib-primary-reading');
+  mainReading.append(el('strong',primary.pinyin),el('p',primary.meaning));
+  header.append(mainReading);
   entry.append(header,strength.meter,time);
 
   const readings = new Map();
   for (const s of item.senses) {
+    if(s.id===primary.id)continue;
     if (!readings.has(s.pinyin)) readings.set(s.pinyin,[]);
     readings.get(s.pinyin).push(s);
   }
+  const others=el('details',null,'lib-other-readings');
+  others.open=current.id!==primary.id;
+  others.append(el('summary','Other readings and meanings'));
   for (const [pinyin, senses] of readings) {
     const section = el('section',null,'lib-reading');
     const h = el('h2');
@@ -185,10 +193,16 @@ async function renderDetail(root,kind,text,sense) {
     if (current.pinyin===pinyin) pronunciation.setAttribute('aria-current','true');
     h.append(pronunciation);
     const meanings = el('ul');
-    for (const s of senses) meanings.append(el('li',s.meaning));
+    for (const s of senses) {
+      const meaning=el('li');
+      if(s.id===current.id)meaning.append(el('strong',s.meaning));
+      else meaning.textContent=s.meaning;
+      meanings.append(meaning);
+    }
     section.append(h,meanings);
-    entry.append(section);
+    others.append(section);
   }
+  if(readings.size)entry.append(others);
   if (item.components.length) {
     entry.append(el('h2','Characters in '+text));
     const pieces = el('div',null,'lib-pieces');

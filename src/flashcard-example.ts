@@ -1,18 +1,21 @@
 import type {DatabaseSync} from 'node:sqlite';
 import {readSession} from './flashcards.ts';
-import {generateText} from './provider.ts';
+import type {ItemKind} from './catalog.ts';
 import {HttpError,type Story} from './store.ts';
 
-export async function flashcardExample(db:DatabaseSync,id:string,index:number,write=generateText){
-  const session=readSession(db,id);
-  if(!session.card||index!==session.index)throw new HttpError(409,'Reopen the current flashcard.');
-  const {kind,text}=session.card;
+export function storedExample(db:DatabaseSync,kind:ItemKind,text:string,target?:{senseId?:string;pinyin:string;meaning:string}){
   const stories=db.prepare(`SELECT content FROM stories WHERE instr(content,?)>0
     AND id NOT IN (SELECT story_id FROM hidden_stories) ORDER BY created_at DESC`).iterate(text);
   for(const row of stories){
     const story:Story=JSON.parse(String(row.content));
     for(const chapter of story.chapters)for(const paragraph of chapter.paragraphs){
-      const i=paragraph.findIndex(t=>!t.cast&&(kind==='word'?t.text===text:t.text.includes(text)));
+      const i=paragraph.findIndex(t=>{
+        if(t.cast)return false;
+        if(!target)return kind==='word'?t.text===text:t.text.includes(text);
+        if(t.text!==text)return false;
+        if(typeof t.sense==='string'&&target.senseId)return t.sense===target.senseId;
+        return t.meaning===target.meaning&&t.pinyin?.replaceAll(' ','')===target.pinyin.replaceAll(' ','');
+      });
       if(i<0)continue;
       const sentence=paragraph.filter(t=>t.sentence===paragraph[i].sentence);
       const match=sentence.indexOf(paragraph[i]);
@@ -22,10 +25,19 @@ export async function flashcardExample(db:DatabaseSync,id:string,index:number,wr
       return {before:prefix+paragraph[i].text.slice(0,offset),target:text,after:paragraph[i].text.slice(offset+text.length)+suffix};
     }
   }
+  if(target)return;
   db.exec('CREATE TABLE IF NOT EXISTS flashcard_examples(text TEXT PRIMARY KEY,before_text TEXT NOT NULL,after_text TEXT NOT NULL)');
   const find=db.prepare('SELECT before_text AS before,text AS target,after_text AS after FROM flashcard_examples WHERE text=?');
-  const saved=find.get(text);
+  return find.get(text) as {before:string;target:string;after:string}|undefined;
+}
+
+export async function flashcardExample(db:DatabaseSync,id:string,index:number,write?:(prompt:string)=>Promise<string>){
+  const session=readSession(db,id);
+  if(!session.card||index!==session.index)throw new HttpError(409,'Reopen the current flashcard.');
+  const {kind,text}=session.card;
+  const saved=storedExample(db,kind,text);
   if(saved)return saved;
+  if(!write)throw new HttpError(404,'No saved example for this entry.');
   const raw=await write('Write one short natural simplified Chinese example sentence using '+text+' in context. Use easy everyday surrounding vocabulary. '+
     'Return only a JSON object with strings "before" and "after". The complete sentence is before + "'+text+'" + after. Include final Chinese punctuation. No spaces, pinyin, translation, blanks or explanation.');
   let parts;
@@ -35,5 +47,5 @@ export async function flashcardExample(db:DatabaseSync,id:string,index:number,wr
     throw new HttpError(502,'A usable Chinese sentence was not returned. Try the hint again.');
   }
   db.prepare('INSERT OR IGNORE INTO flashcard_examples VALUES(?,?,?)').run(text,parts.before,parts.after);
-  return find.get(text)!;
+  return {before:parts.before,target:text,after:parts.after};
 }

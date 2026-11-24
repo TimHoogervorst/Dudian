@@ -55,7 +55,11 @@ export function encounterFor(db:DatabaseSync,text:string){
   return {lastSeen:row?Number(row.last_seen):null,dueAt:row?Number(row.due_at):null};
 }
 
-export function seeItem(db:DatabaseSync,text:string,now:number,settled=false){
+export function seeItem(db:DatabaseSync,text:string,now:number,settled=false,creditCoverage=true){
+  if(creditCoverage){
+    const insert=db.prepare('INSERT OR IGNORE INTO milestone_characters VALUES(?)');
+    for(const char of text)if(/\p{Script=Han}/u.test(char))insert.run(char);
+  }
   db.prepare(`INSERT INTO item_encounters VALUES(?,?,?)
     ON CONFLICT(text) DO UPDATE SET last_seen=max(last_seen,excluded.last_seen),
     due_at=CASE WHEN excluded.last_seen>=last_seen AND (? OR due_at>excluded.last_seen)

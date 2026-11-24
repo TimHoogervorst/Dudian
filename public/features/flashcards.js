@@ -1,27 +1,16 @@
 import {el,api,link,ui} from '../ui.js';
+import {drawPractice} from '../practice-exercises.js';
 import {summaryHeading} from '../summary-heading.js';
 
 async function startReview(options) {
-  const session = await api('/api/flashcards/sessions',options);
-  ui.navigate('/cards/'+session.id);
+  const session = await api('/api/practice/sets',options);
+  ui.navigate('/exercises/'+session.id);
 }
 export function startWordReview(words) {
   return startReview({kind:'word',words});
 }
 function libraryAction({root,parts}) {
-  if(parts[1]==='entry'){
-    const entry=root.querySelector('.lib-entry');
-    if(!entry)return;
-    const button=el('button','Practice this '+(parts[0]==='word'?'word':'character'),'button');
-    button.onclick=async()=>{
-      button.disabled=true;
-      try{await startWordReview([parts[2]]);}
-      catch(error){ui.notice(error.message);}
-      finally{button.disabled=false;}
-    };
-    entry.append(button);
-    return;
-  }
+  if(parts[1]==='entry')return;
   const button = el('button','Practice','button lib-review');
   button.onclick = async () => {
     button.disabled=true;
@@ -40,7 +29,7 @@ function drawSummary(root,session){
     const group=item.points===null?'Earlier reviews':item.points>0?'Improved':item.points<0?'Went down':'Held steady';
     groups.get(group).push(item);
   }
-  const metrics=[[session.total,'Cards reviewed'],[session.results.filter(item=>item.grade==='correct').length,'Got it'],
+  const metrics=session.exercise===null?[[session.total,'Exercises'],[session.results.length,'Items reviewed'],[session.results.filter(i=>i.grade==='correct').length,'Correct']]:[[session.total,'Cards reviewed'],[session.results.filter(item=>item.grade==='correct').length,'Got it'],
     [session.results.filter(item=>item.grade==='almost').length,'Almost'],[session.results.filter(item=>item.grade==='incorrect').length,'Incorrect']];
   const titles={mixed:'Words and characters',word:'Word practice',character:'Character practice'};
   page.append(summaryHeading('Practice complete',titles[session.kind],metrics));
@@ -48,7 +37,7 @@ function drawSummary(root,session){
     if(!items.length)continue;
     const section=el('section',null,'summary-panel');
     const heading=el('div',null,'summary-section-heading');
-    heading.append(el('h2',name),el('span',items.length+(items.length===1?' card':' cards')));
+    heading.append(el('h2',name),el('span',items.length+(items.length===1?' item':' items')));
     const cards=el('div',null,'summary-characters');
     for(const item of items){
       const card=link('','#/library/'+item.kind+'/entry/'+encodeURIComponent(item.text),'summary-character');
@@ -65,6 +54,15 @@ function drawSummary(root,session){
     section.append(cards);page.append(section);
   }
   const actions=el('div',null,'summary-actions');
+  if(session.remainingDue){
+    const more=el('button','Practice more · '+session.remainingDue+' still due','button');
+    more.onclick=async()=>{
+      more.disabled=true;
+      try{const next=await api('/api/practice/sets/'+session.id+'/extend',{});ui.navigate('/exercises/'+next.id);}
+      catch(error){ui.notice(error.message);more.disabled=false;}
+    };
+    actions.append(more);
+  }
   actions.append(link('Back to Library',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'button'));
   page.append(actions);root.append(page);
 }
@@ -156,6 +154,10 @@ function draw(root,session) {
 }
 export function setup(ui) {
   ui.on('library',libraryAction);
+  ui.route('exercises',async ({root,parts})=>{
+    const session=await api('/api/practice/sets/'+encodeURIComponent(parts[0]));
+    drawPractice(root,session,drawSummary);
+  });
   ui.route('cards',async ({root,parts})=>{
     const session = await api('/api/flashcards/sessions/'+encodeURIComponent(parts[0]));
     draw(root,session);

@@ -1,4 +1,4 @@
-import {displayLevel} from '../reading-progress.js';
+import {displayLevel,readingProgress} from '../reading-progress.js';
 import {icon} from '../icons.js';
 import {api,el} from '../ui.js';
 
@@ -41,7 +41,8 @@ function intervalSummary(level,cards){
 
 export function setup(ui){
   ui.route('progression',async({root,signal})=>{
-    const {level,groups}=await api('/api/progression',undefined,signal);
+    const progress=await api('/api/progression',undefined,signal);
+    const {level,groups}=progress;
     if(signal.aborted)return;
     const cards=groups.flatMap(({type,cards})=>cards.map(card=>({...card,type})))
       .sort((a,b)=>a.threshold-b.threshold);
@@ -82,7 +83,9 @@ export function setup(ui){
         '✓ Unlocked'+(card.current?' · Current stage':''):'Locked · Reach HSK '+card.threshold));
       return item;
     }
-    root.append(heading,hskScale(level,filterButton),intervalSummary(level,cards),section);
-    select(Math.min(6,Math.floor(level)+1));
+    const summary=intervalSummary(level,cards);
+    if(progress.milestone||progress.passed)summary.firstElementChild.replaceWith(readingProgress(level,undefined,progress));
+    root.append(heading,hskScale(level,filterButton),summary,section);
+    select(progress.milestone??Math.min(6,Math.floor(level)+1));
   });
 }

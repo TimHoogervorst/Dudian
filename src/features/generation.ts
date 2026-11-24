@@ -1,5 +1,6 @@
 import {progression} from '../reading-types.ts';
 import {hskReadingProgress} from '../strength.ts';
+import {milestoneProgress} from '../milestone-progress.ts';
 import {practicePreview,confirmedPlan} from '../practice-preview.ts';
 import type { Context } from '../server.ts';
 import { getPreferences, setPreferences } from '../story-plan.ts';
@@ -8,7 +9,7 @@ import { latestGeneration, startGeneration } from '../generation-job.ts';
 export default async function generation({url,req,body,json,store}:Context) {
   if(url.pathname==='/api/progression' && req.method==='GET'){
     const level=hskReadingProgress(store.db);
-    json(200,{level,groups:progression(level)});
+    json(200,{...milestoneProgress(store.db,level),groups:progression(level)});
   } else if (url.pathname === '/api/story-preferences' && req.method==='GET') {
     json(200,getPreferences(store));
   } else if (url.pathname === '/api/story-preferences' && req.method==='POST') {
