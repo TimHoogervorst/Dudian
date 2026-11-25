@@ -44,16 +44,28 @@ test('a reached score unlocks preparation without character encounters and repor
   const paused=new Promise<void>(resolve=>{resume=resolve;});
   let started!:()=>void;
   const second=new Promise<void>(resolve=>{started=resolve;});
-  let chapters=0;
+  let chapters=0,challengedName=false,repairedName=false;
   const job=generateTest(db,1,async prompt=>{
     if(prompt.startsWith('Write simplified Mandarin')&&++chapters===2){started();await paused;}
-    return passages(prompt);
+    const draft=await passages(prompt);
+    if(!challengedName&&prompt.includes('natural Mandarin messaging conversation')){
+      challengedName=true;
+      const story=JSON.parse(draft);
+      story.chapters[0].names[0]='龍';
+      return JSON.stringify(story);
+    }
+    if(prompt.includes('Validation feedback: Use speaker names')){
+      repairedName=true;
+      return JSON.stringify(JSON.parse(draft).chapters[0]);
+    }
+    return draft;
   });
   await second;
   assert.equal(preparation(db,1).completed,1);
-  assert.equal(preparation(db,1).total,9);
+  assert.equal(preparation(db,1).total,5);
   resume();
   const id=await job;
+  assert(repairedName,'An out-of-level speaker name must be revised before the test is ready.');
   assert.equal(preparation(db,1).attempt?.id,id);
   assert.equal(progress.passed,0);
 });
@@ -71,23 +83,24 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
   assert.equal(id,duplicate);
   const intro=testView(db,id);
   assert.equal(intro.status,'ready');
-  assert.equal(intro.sections.length,15);
+  assert.equal(intro.sections.length,10);
+  assert.deepEqual(intro.sections.filter(s=>s.kind!=='Practice').map(s=>s.kind),['Book','Dialogue','Article','Book','Dialogue']);
   const wordPractice=intro.sections.filter(s=>s.kind==='Practice');
-  assert.equal(wordPractice.length,6);
-  for(const section of wordPractice)assert.equal(section.tasks.length,10);
-  assert.equal(intro.sections.reduce((n,s)=>n+s.tasks.length,0),78);
+  assert.equal(wordPractice.length,5);
+  for(const section of wordPractice)assert.equal(section.tasks.length,5);
+  assert.equal(intro.sections.reduce((n,s)=>n+s.tasks.length,0),35);
 
   assert.equal(intro.sections[0].lines.length,3);
   assert(intro.sections[0].lines[0].tokens?.every(t=>!('meaning' in t)));
   assert.equal(intro.sections.find(s=>s.kind==='Dialogue')?.speakers?.length,14);
   for(const section of intro.sections){
-    if(section.kind==='Book')assert(section.lines.some(line=>line.text.includes('包包')));
+    assert(catalog.usesCharactersThrough(JSON.stringify(section),1));
     if(section.kind==='Dialogue')assert.equal(section.names?.length,2);
     if(section.kind==='Article')assert.deepEqual(section.sections,['greeting','body','body','body','signature']);
   }
   assert.equal(db.prepare('SELECT count(*) AS n FROM stories').get()!.n,1);
 
-  function run(id:string,fail:boolean){
+  function run(id:string,readingMistakes:number,practiceMistakes:number){
     const sections=JSON.parse(String(db.prepare('SELECT sections FROM milestone_tests WHERE id=?').get(id)!.sections));
     const view=startTest(db,id);
     assert.equal(view.position,-1);
@@ -100,8 +113,16 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
       view.sections[section].tasks.forEach((q,task)=>{
         const e=s.exercises[task];
         const answers=e?e.targets.map((item:{meaning:string})=>e.options.indexOf(item.meaning)):[s.questions[task].correct];
-        if(section===0||section===2&&task===0)answers[0]=(answers[0]+1)%s.questions[task].choices.length;
-        if(fail&&e?.type==='match')[answers[0],answers[1]]=[answers[1],answers[0]];
+        if(!e&&readingMistakes>0){
+          answers[0]=(answers[0]+1)%s.questions[task].choices.length;
+          readingMistakes--;
+        }else if(e?.type==='match'&&practiceMistakes>=2){
+          [answers[0],answers[1]]=[answers[1],answers[0]];
+          practiceMistakes-=2;
+        }else if(e?.type==='choice'&&practiceMistakes%2===1){
+          answers[0]=(answers[0]+1)%e.options.length;
+          practiceMistakes--;
+        }
         saveDraft(db,id,section,task,answers);
       });
     }
@@ -111,14 +132,21 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
     assert.deepEqual(submitTest(db,id),result);
     return result;
   }
-  const failed=run(id,true);
+  const failed=run(id,2,4);
   assert.equal(failed.status,'failed');
-  assert(failed.mistakes>3);
+  assert.equal(failed.reading.mistakes,2);
+  assert.equal(failed.practice.mistakes,4);
+  const readingFailure=run(await generateTest(db,1,passages),4,2);
+  assert.equal(readingFailure.status,'failed');
+  assert.equal(readingFailure.reading.mistakes,4);
+  assert.equal(readingFailure.practice.mistakes,2);
   const retry=await generateTest(db,1,passages);
   assert.notEqual(id,retry);
-  const passed=run(retry,false);
+  const passed=run(retry,3,3);
   assert.equal(passed.status,'passed');
-  assert.equal(passed.mistakes,3);
+  assert.equal(passed.mistakes,6);
+  assert.equal(passed.reading.mistakes,3);
+  assert.equal(passed.practice.mistakes,3);
   assert.equal(milestoneProgress(db).milestone,2);
   discardTest(db,retry);
   assert.equal(milestoneProgress(db).passed,1);

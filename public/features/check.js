@@ -1,4 +1,4 @@
-import {questionCard} from '../question-card.js';
+import {comprehensionChoices,questionCard} from '../question-card.js';
 import {markCompleted,reviewHref} from '../reader-layout.js';
 
 export function setup(ui){
@@ -98,7 +98,7 @@ export async function mountCheck(ui,context){
         for(const en of choices.querySelectorAll('small'))en.hidden=!translation.open;
       };
       card.append(translation);
-      const choices=el('div',null,'check-choices');
+      const choices=comprehensionChoices(q.choices.map(choice=>choice.zh));
       q.choices.forEach((c,j)=>{
         const button=el('button');
         button.append(chinese(c,false));

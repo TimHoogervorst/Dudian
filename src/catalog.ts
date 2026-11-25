@@ -83,6 +83,9 @@ export const catalog = {
     return senses.find(s=>s.pinyin===s.pinyin.toLowerCase()&&!/\p{Script=Han}/u.test(s.meaning)&&
       !/^(?:surname |(?:old )?variant of |classifier for |see |used in )|ethnic group|\barchaic\b/i.test(s.meaning))??senses[0];
   },
+  usesCharactersThrough(text:string,level:number){
+    return Array.from(text).every(char=>!/\p{Script=Han}/u.test(char)||(levels.get(char)??Infinity)<=level);
+  },
   wordLevel(text:string){return wordLevels.get(text);},
   isCurriculumWord(text:string){return wordLevels.has(text);},
   libraryItems(kind:ItemKind,level:number){

@@ -1,3 +1,4 @@
+import {catalog} from './catalog.ts';
 import {messages,type ArticleKind} from './reading-types.ts';
 import {paragraphCounts,type Difficulty,type StoryPlan} from './story-plan.ts';
 
@@ -27,6 +28,7 @@ export function formatRules(plan:StoryPlan){
   if(format?.stage==='Baby book')return 'Write a very simple baby book. Each chapter has 4 to 8 pages. Each paragraph is one page with exactly one short sentence of at most 12 words. Use repetition and one concrete change per page. End each page after one sentence. Bāobāo may appear. Keep one narrative across all chapters.';
   const cast=!format||format.stage==='Children’s book';
   return [
+    cast&&!bookWithCast(plan)?'Write a children’s picture-book adventure with a concrete goal and visible outcome. Use a protagonist from the approved glossary.':
     cast?'The protagonist is always 包包 (Bāobāo), a little cream-colored steamed bun with a green satchel. Use 包包:1 as his name. Write a picture-book adventure with a concrete goal and visible outcome.':'Write a chapter book with a single unfolding plot. Carry clues, motivations or consequences from one scene into the next.',
     'Write approximately '+plan.targetWords+' word occurrences. Every chapter must have '+paragraphCounts[plan.difficulty].join(' to ')+' paragraphs. Aim for 40 segmented words per paragraph.'
   ].join('\n');
@@ -42,5 +44,6 @@ export function articleSectionsValid(kind:ArticleKind,roles:unknown,count:number
   return runs.length===expected.length && runs.every((role,i)=>role===expected[i]);
 }
 export function bookWithCast(plan:StoryPlan){
-  return !plan.format || (plan.format.type==='book' && plan.format.stage!=='Chapter book');
+  return (!plan.format || (plan.format.type==='book' && plan.format.stage!=='Chapter book'))&&
+    (plan.hskLimit===undefined||catalog.usesCharactersThrough('包包',plan.hskLimit));
 }

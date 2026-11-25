@@ -40,6 +40,7 @@ function promptFor(plan:StoryPlan,dictionary:Lexicon) {
   return [
     'Write simplified Mandarin for a learner. Titles are short and in English.',formatRules(plan),
     ...(plan.subject?['Focus the reading on the selected subject '+plan.subject.en+' ('+plan.subject.zh+'). Express it using the approved glossary and weave the focus words into the action.']:[]),
+    ...(plan.hskLimit?['Use only Chinese characters through HSK '+plan.hskLimit+' everywhere, including speaker names. Choose names using characters in the approved glossary.']:[]),
     'This learner has strong reading knowledge of '+(plan.strongCharacters??0)+' distinct Chinese characters.',
     'Include a teaser property: one or two short spoiler-free Chinese sentences, encoded as a flat array of the same FORM:NUMBER and punctuation tokens.',
     'Return only a JSON object with title, teaser and chapters. Each chapter has title, paragraphs and translations. translations is an array of natural English strings, exactly one full translation per paragraph in matching order. Preserve dialogue, names and meaning without adding explanations. Each paragraph is an array of sentences. Each sentence is an ordered array of strings.',
@@ -103,6 +104,7 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   const schedule=chapterFocus(plan);
   for(const [i,chapter] of chapters.entries()){
     const format=plan.format, raw=candidate.chapters[i];
+    if(plan.hskLimit&&!catalog.usesCharactersThrough(chapter.title,plan.hskLimit))throw new CandidateError('Use an English chapter title.',i);
     if(format?.type==='dialogue'){
       const {names,speakers}=raw;
       if(!Array.isArray(names)||names.length!==format.people||!names.every(validSpeakerName)||new Set(names).size!==names.length||
@@ -111,6 +113,8 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
       if(!Array.isArray(speakers)||speakers.length!==messages[plan.difficulty]||speakers.length!==chapter.paragraphs.length||
         !speakers.every(n=>Number.isInteger(n)&&n>=0&&n<format.people)||new Set(speakers).size!==format.people)
         throw new CandidateError('Provide exactly '+messages[plan.difficulty]+' messages and one speaker index per message, including each participant.',i);
+      if(plan.hskLimit&&names.some((name:string)=>!catalog.usesCharactersThrough(name,plan.hskLimit!)))
+        throw new CandidateError('Use speaker names made from characters in the approved glossary.',i);
       chapter.names=names;chapter.speakers=speakers;
     }else if(format?.type==='article'){
       if(!articleSectionsValid(format.documents[i],raw.sections,chapter.paragraphs.length,plan.difficulty))
@@ -162,7 +166,7 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   }
   const scene=chapters.flatMap(c=>c.paragraphs).find(tokens=>tokens.some(t=>t.cast));
   if(scene&&!bookWithCast(plan))throw new CandidateError('Use ordinary vocabulary in this reading, without the cast name.',chapters.findIndex(c=>c.paragraphs.includes(scene)));
-  if(!scene&&(!plan.format||(plan.format.type==='book'&&plan.format.stage==='Children’s book')))throw new CandidateError('Name 包包:1 as the protagonist in the chapter text.',0);
+  if(!scene&&bookWithCast(plan)&&(!plan.format||(plan.format.type==='book'&&plan.format.stage==='Children’s book')))throw new CandidateError('Name 包包:1 as the protagonist in the chapter text.',0);
   let teaser:string;
   let tokens:Token[];
   try{

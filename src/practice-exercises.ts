@@ -66,10 +66,11 @@ function meaningChoice(text:string,alternatives:string[]):Exercise{
   return {type:'choice',targets:[item],options:shuffle(choices.map(i=>i.meaning))};
 }
 
-export function exerciseView(db:DatabaseSync,exercise:Exercise){
+export function exerciseView(db:DatabaseSync,exercise:Exercise,hskLimit?:number){
   const item=exercise.targets[0];
   const example=exercise.type==='choice'?storedExample(db,item.kind,item.text,item):undefined;
-  return {type:exercise.type,options:exercise.options,example,targets:exercise.targets.map(({text,pinyin})=>({text,pinyin}))};
+  const showExample=example&&(!hskLimit||catalog.usesCharactersThrough(example.before+example.target+example.after,hskLimit));
+  return {type:exercise.type,options:exercise.options,example:showExample?example:undefined,targets:exercise.targets.map(({text,pinyin})=>({text,pinyin}))};
 }
 
 export function checkExercise(exercise:Exercise,answers:number[]){
@@ -83,11 +84,14 @@ export function checkExercise(exercise:Exercise,answers:number[]){
 }
 
 export function planMilestoneWordPractice(level:number){
-  const options=shuffle(pool(level).filter(text=>catalog.studySense(text)));
+  const options=shuffle(pool(level).filter(text=>{
+    const sense=catalog.studySense(text);
+    return sense&&catalog.usesCharactersThrough(sense.meaning,level);
+  }));
   const remaining=new Set(options);
   return function nextSection(){
-    return Array.from({length:10},(_,index)=>{
-      const exercise=(index===2||index===6?matchingExercise(remaining):undefined)
+    return Array.from({length:5},(_,index)=>{
+      const exercise=(index===2?matchingExercise(remaining):undefined)
         ??meaningChoice(remaining.values().next().value!,options);
       for(const item of exercise.targets)remaining.delete(item.text);
       return exercise;

@@ -26,7 +26,7 @@
 .practice-reading{display:grid;gap:.2rem}
 .practice-glyph{font:500 2rem "Songti SC","SimSun",serif}
 .practice-controls>.practice-reading .practice-glyph{font-size:clamp(3.5rem,12vw,6rem)}
-.practice-controls button[hidden]{display:none}
+.practice-controls button[hidden],.empty-slot[hidden]{display:none}
 .practice-options,.practice-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin:1.3rem 0}
 .practice-options button,.meaning-card{white-space:normal;overflow-wrap:anywhere;min-height:48px}
 .practice-board{grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:clamp(.6rem,3vw,1.6rem);align-items:start}

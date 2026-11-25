@@ -28,31 +28,31 @@ function sample(words:string[],count:number){
   return Array.from({length:Math.min(count,pool.length)},()=>pool.splice(randomInt(pool.length),1)[0]);
 }
 
+const passageKinds=['Book','Dialogue','Article','Book','Dialogue'] as const;
+
 async function generateSections(level:number,generate:typeof generateText,report:(completed:number)=>void){
-  const readingLevel=Math.min(6,level+1);
-  const targets=sample(catalog.list('word',level).map(w=>w.text),18);
+  const targets=sample(catalog.list('word',level).map(w=>w.text),passageKinds.length*2);
   // Keep common function words available and the sense-numbered glossary within a single chapter prompt.
   const background=catalog.list('word',1).map(w=>w.text);
-  for(let band=2;band<=readingLevel;band++)background.push(...sample(catalog.list('word',band).map(w=>w.text),40));
+  for(let band=2;band<=level;band++)background.push(...sample(catalog.list('word',band).map(w=>w.text),40));
   const strongCharacters=new Set(catalog.list('character').filter(c=>c.level<=level).map(c=>c.text)).size;
   const formatLevel=Math.max(...Object.values(milestones).flat().map(([,threshold])=>threshold).filter(n=>n<level));
-  const documents=articleDocuments(formatLevel,3);
   const sections:Section[]=[];
   const nextWordPractice=planMilestoneWordPractice(level);
-  for(let i=0;i<passagesPerTest;i++){
+  for(const [i,kind] of passageKinds.entries()){
     const {stage,people}=readingOptions(formatLevel);
-    const formats:ReadingFormat[]=[{type:'book',stage},{type:'article',documents:[documents[Math.floor(i/3)]]},{type:'dialogue',people}];
-    const format=formats[i%3];
+    const format:ReadingFormat=kind==='Book'?{type:'book',stage}:kind==='Dialogue'?{type:'dialogue',people}:
+      {type:'article',documents:articleDocuments(formatLevel,1)};
     const focus=targets.slice(i*2,i*2+2);
-    const plan={...readingSize('hard',10),format,background:[...new Set([...background,...focus])],newWords:focus,
+    const plan={...readingSize('hard',10),format,hskLimit:level,background:[...new Set([...background,...focus])],newWords:focus,
       strongCharacters,newCharacters:[],reviewWords:[],ceiling:0};
     const story=await generateReading(plan,generate,[],undefined,focus);
     const chapter=story.chapters[0];
     const display=(part:QuizText)=>readingLine(dictionaryTokens(story,part.zh,part.words));
-    sections.push({title:chapter.title,kind:['Book','Article','Dialogue'][i%3],lines:chapter.paragraphs.map(readingLine),
+    sections.push({title:chapter.title,kind,lines:chapter.paragraphs.map(readingLine),
       names:chapter.names,speakers:chapter.speakers,sections:chapter.sections,
       questions:chapter.questions!.map(q=>({prompt:display(q.prompt),choices:q.choices.map(display),correct:q.correct})),exercises:[]});
-    if(i%3!==2)sections.push({title:'Word practice',kind:'Practice',lines:[],questions:[],
+    sections.push({title:'Word practice',kind:'Practice',lines:[],questions:[],
       exercises:nextWordPractice()});
     report(i+1);
   }
@@ -80,7 +80,6 @@ function displayLine(line:Line){
   return readingLine(words);
 }
 
-const passagesPerTest=9;
 type PreparationJob={completed:number;work:Promise<string>};
 const jobs=new WeakMap<DatabaseSync,Map<number,PreparationJob>>();
 const failures=new WeakMap<DatabaseSync,Set<number>>();
@@ -118,7 +117,7 @@ export function prepareMilestones(db:DatabaseSync,generate=generateText){
 }
 export function preparation(db:DatabaseSync,level:number){
   const job=jobs.get(db)?.get(level);
-  return {completed:job?.completed??0,total:passagesPerTest,attempt:active(db,level),failed:failures.get(db)?.has(level)??false};
+  return {completed:job?.completed??0,total:passageKinds.length,attempt:active(db,level),failed:failures.get(db)?.has(level)??false};
 }
 function load(db:DatabaseSync,id:string){
   const row=db.prepare('SELECT * FROM milestone_tests WHERE id=?').get(id);
@@ -140,8 +139,13 @@ function grade(a:ReturnType<typeof load>){
       return chosen===meaning?[]:[{section,task,text,chosen,meaning}];
     });
   }).flat());
-  const unanswered=review.filter(r=>r.chosen===null).length;
-  return {review,unanswered,mistakes:review.length-unanswered};
+  const reading={mistakes:0,unanswered:0},practice={mistakes:0,unanswered:0};
+  for(const item of review){
+    const counts=a.sections[item.section].questions.length?reading:practice;
+    if(item.chosen===null)counts.unanswered++;
+    else counts.mistakes++;
+  }
+  return {review,reading,practice,unanswered:reading.unanswered+practice.unanswered,mistakes:reading.mistakes+practice.mistakes};
 }
 export function testView(db:DatabaseSync,id:string){
   const a=load(db,id);
@@ -149,7 +153,7 @@ export function testView(db:DatabaseSync,id:string){
     practiceRetake:a.status==='active'&&!!db.prepare('SELECT 1 FROM milestone_passes WHERE level=?').get(a.level),
     sections:a.sections.map(s=>({kind:s.kind,title:s.title,lines:s.lines.map(displayLine),names:s.names,speakers:s.speakers,sections:s.sections,
       tasks:[...s.questions.map(q=>({prompt:displayLine(q.prompt),targets:[],options:q.choices.map(displayLine)})),
-        ...s.exercises.map(e=>({prompt:null,...exerciseView(db,e)}))]}))};
+        ...s.exercises.map(e=>({prompt:null,...exerciseView(db,e,a.level)}))]}))};
   if(a.status==='failed'||a.status==='passed')return {...view,...grade(a)};
   return view;
 }
@@ -178,8 +182,9 @@ export function submitTest(db:DatabaseSync,id:string){
   const a=load(db,id);
   if(a.status==='ready')throw new HttpError(409,'Start this test first.');
   if(a.status==='active'){
-    const {mistakes,unanswered}=grade(a);
-    db.prepare('UPDATE milestone_tests SET status=?,mistakes=? WHERE id=?').run(unanswered||mistakes>3?'failed':'passed',mistakes,id);
+    const {reading,practice,mistakes,unanswered}=grade(a);
+    const passed=unanswered===0&&reading.mistakes<=3&&practice.mistakes<=3;
+    db.prepare('UPDATE milestone_tests SET status=?,mistakes=? WHERE id=?').run(passed?'passed':'failed',mistakes,id);
   }
   return testView(db,id);
 }

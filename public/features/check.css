@@ -11,6 +11,16 @@
 .check-choices small[hidden] { display:none; }
 .check-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin-top: 1rem; }
 .check-choices button { padding: .65rem; overflow-wrap: anywhere; }
+.comprehension-choices button {
+  container-type: inline-size;
+  min-height: 5.5rem;
+  max-height: 12rem;
+  overflow: auto;
+  padding: .85rem .75rem;
+}
+.comprehension-choices .check-chinese {
+  font-size: clamp(1.35rem, calc(100cqi / var(--characters-per-line)), 1.85rem);
+}
 .check-choices small { display: block; margin-top: .3rem; }
 .check-choices button:disabled { opacity: 1; cursor: default; }
 .check-choices .check-correct { background: #dfeddb; color: #264a30; border-color: #729677; }

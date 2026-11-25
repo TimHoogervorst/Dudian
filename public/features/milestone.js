@@ -1,6 +1,6 @@
 import {api,el,link} from '../ui.js';
 import {choicePrompt,matching} from '../practice-exercises.js';
-import {questionCard} from '../question-card.js';
+import {comprehensionChoices,questionCard} from '../question-card.js';
 import {stopReading} from '../reader-audio.js';
 import {summaryHeading} from '../summary-heading.js';
 import {addCheckmark,readerFrame,chapterHeading,readingWord} from '../reader-layout.js';
@@ -49,7 +49,8 @@ export function setup(ui){
         const panel=el('section',null,'summary-panel test-result');
         const passed=state.status==='passed';
         panel.append(summaryHeading('HSK '+state.level+' milestone test',passed?'Passed':'Failed',
-          [[state.mistakes,'Incorrect'],[state.unanswered,'Unanswered']],null,passed));
+          [[state.reading.mistakes,'Reading mistakes'],[state.practice.mistakes,'Word practice mistakes']],null,passed));
+        panel.append(el('p','Unanswered: '+state.reading.unanswered+' reading · '+state.practice.unanswered+' word practice.'));
         for(const r of state.review){
           const entry=el('section',null,'test-review');
           entry.append(el('small',state.sections[r.section].title+' · Question '+(r.task+1)),el('h2',r.text),
@@ -83,7 +84,7 @@ export function setup(ui){
         center.append(chapterHeading('HSK '+state.level+' milestone test','Introduction'),
           el('p','Read the passages and answer the vocabulary questions. You can visit the sections in any order and change your answers before handing in the test.'),
           el('h2','How to pass'),
-          el('p','Answer every question and make at most three mistakes. Each incorrect matching pair counts as one mistake. A blank answer or a fourth mistake means the test is failed.'),
+          el('p','You can miss up to three reading comprehension questions and up to three word-practice items. Each incorrect matching pair counts as one word-practice mistake. Four mistakes in either category or any unanswered item will fail the test.'),
           el('h2','When you’re ready'),
           el('p','Choose Submit test at the end of the section list. Your summary will show whether you passed and which answers you missed.'),
           el('p',outcome+' If you fail, you can take a fresh test as many times as you need.'),
@@ -128,7 +129,7 @@ export function setup(ui){
           if(!blanks(index))addCheckmark(sectionLinks[index]);
           if(q.targets.length<=1)Array.from(choices.children).forEach((b,j)=>b.setAttribute('aria-pressed',String(j===values[0])));
         });
-        const choices=el('div',null,q.prompt?'check-choices':'check-choices practice-options');
+        const choices=q.prompt?comprehensionChoices(q.options.map(choice=>choice.text)):el('div',null,'check-choices practice-options');
         if(q.targets.length>1)matching(card,q,null,{answers,change:save});
         else{
           if(q.type==='choice')choicePrompt(card,q);
