@@ -1,11 +1,12 @@
-import {displayLevel,readingProgress} from '../reading-progress.js';
+import {testActions} from '../test-actions.js';
+import {displayLevel} from '../reading-progress.js';
 import {icon} from '../icons.js';
-import {api,el} from '../ui.js';
+import {api,el,link} from '../ui.js';
 
 function hskScale(level,filterButton){
   const scale=el('div',null,'roadmap-scale');
   scale.setAttribute('role','group');
-  scale.setAttribute('aria-label','Filter formats by HSK level. Current score '+displayLevel(level));
+  scale.setAttribute('aria-label','Select an HSK level to view its test and reading formats. Current score '+displayLevel(level));
   scale.style.setProperty('--position',level/6*100+'%');
   const rail=el('div',null,'roadmap-rail');
   for(let i=0;i<=6;i++){
@@ -20,27 +21,17 @@ function hskScale(level,filterButton){
   return scale;
 }
 
-function intervalSummary(level,cards){
-  const band=Math.min(5,Math.floor(level));
-  const percent=Math.floor((level-band)*100+1e-9);
-  const summary=el('div',null,'roadmap-summary');
-  const interval=el('section');
-  const heading=el('div',null,'hsk-progress-heading');
-  heading.append(el('h2','Current interval · '+(band?'HSK '+band:'0')+' → HSK '+(band+1)),el('strong',percent+'%'));
-  const track=el('div',null,'hsk-progress-track');
-  track.style.setProperty('--progress',percent+'%');
-  interval.append(heading,track);
+function nextUnlock(cards){
   const upcoming=el('section');
   const next=cards.find(card=>!card.unlocked);
   const names=next?cards.filter(card=>card.threshold===next.threshold).map(card=>card.label):[];
   upcoming.append(el('h2',next?'Next unlock · HSK '+next.threshold:'All formats unlocked'),
     el('p',next?new Intl.ListFormat('en').format(names):cards.length+' of '+cards.length+' reading formats'));
-  summary.append(interval,upcoming);
-  return summary;
+  return upcoming;
 }
 
 export function setup(ui){
-  ui.route('progression',async({root,signal})=>{
+  ui.route('progression',async({root,signal,parts})=>{
     const progress=await api('/api/progression',undefined,signal);
     const {level,groups}=progress;
     if(signal.aborted)return;
@@ -49,6 +40,23 @@ export function setup(ui){
     const heading=el('header',null,'progression-heading');
     heading.append(el('h1','Progression'),el('p',cards.filter(card=>card.unlocked).length+' of '+cards.length+' formats unlocked'));
     const filters=new Map();
+    const summary=el('div',null,'roadmap-summary');
+    const test=el('section',null,'roadmap-test');
+    summary.append(test,nextUnlock(cards));
+    const defaultLevel=progress.milestone??Math.min(6,progress.passed+1);
+    function showTest(score){
+      const passed=score<=progress.passed;
+      test.replaceChildren(el('h2','HSK '+score+' test'));
+      if(!passed&&score!==progress.milestone){
+        test.append(el('p','Locked · Reach HSK '+score+' to unlock this test.'));
+        return;
+      }
+      test.append(el('p',passed?'Passed · Practice retakes are available.':'Milestone reached · Pass this test to continue.'),
+        testActions(score,passed));
+      for(const result of progress.summaries.filter(s=>s.level===score)){
+        test.append(link('Review '+result.status+' test','#/milestone/'+result.id,'test-result-link'));
+      }
+    }
     const section=el('section',null,'milestone-group');
     const list=el('ol');
     const title=el('h2');
@@ -68,6 +76,9 @@ export function setup(ui){
       return button;
     }
     function select(score){
+      if(Number.isInteger(score)&&score>0)showTest(score);
+      else if(score===0)test.replaceChildren(el('h2','Milestone tests'),el('p','Reach HSK 1 to unlock your first test.'));
+      else showTest(defaultLevel);
       for(const [value,button] of filters)button.setAttribute('aria-pressed',String(value===score));
       title.textContent=score===null?'All reading formats':'Reading formats · HSK '+score;
       const matches=cards.filter(card=>score===null||card.threshold===score);
@@ -83,9 +94,8 @@ export function setup(ui){
         '✓ Unlocked'+(card.current?' · Current stage':''):'Locked · Reach HSK '+card.threshold));
       return item;
     }
-    const summary=intervalSummary(level,cards);
-    if(progress.milestone||progress.passed)summary.firstElementChild.replaceWith(readingProgress(level,undefined,progress));
     root.append(heading,hskScale(level,filterButton),summary,section);
-    select(progress.milestone??Math.min(6,Math.floor(level)+1));
+    const requested=Number(parts[0]);
+    select(Number.isInteger(requested)&&requested>=1&&requested<=6?requested:defaultLevel);
   });
 }

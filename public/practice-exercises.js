@@ -7,25 +7,30 @@ function written(item){
   label.append(glyph,el('span',item.pinyin,'recall-pinyin'));
   return label;
 }
-function choice(card,exercise,submit){
-  const item=exercise.targets[0];
-  card.append(written(item));
-  const voice=window.speechSynthesis?.getVoices().find(v=>v.localService&&/^(?:cmn|zh(?:[-_](?:CN|SG|Hans)|$))/i.test(v.lang));
-  if(voice){
-    const listen=el('button','Listen','recall-example-button');
-    listen.onclick=()=>{
-      const speech=new SpeechSynthesisUtterance(item.text);
-      speech.voice=voice;speech.lang=voice.lang;
-      window.speechSynthesis.speak(speech);
-    };
-    card.append(listen);
-  }
+export function choicePrompt(card,exercise,listen){
+  card.append(written(exercise.targets[0]));
+  if(listen)card.append(listen);
   if(exercise.example){
     const {before,target,after}=exercise.example;
     const sentence=el('p',null,'recall-example');sentence.lang='zh-Hans';
     sentence.append(before,el('mark',target),after);
     card.append(sentence);
   }
+}
+
+function choice(card,exercise,submit){
+  const item=exercise.targets[0];
+  let listen;
+  const voice=window.speechSynthesis?.getVoices().find(v=>v.localService&&/^(?:cmn|zh(?:[-_](?:CN|SG|Hans)|$))/i.test(v.lang));
+  if(voice){
+    listen=el('button','Listen','recall-example-button');
+    listen.onclick=()=>{
+      const speech=new SpeechSynthesisUtterance(item.text);
+      speech.voice=voice;speech.lang=voice.lang;
+      window.speechSynthesis.speak(speech);
+    };
+  }
+  choicePrompt(card,exercise,listen);
   const grid=el('div',null,'practice-options');
   exercise.options.forEach((meaning,index)=>{
     const button=el('button',meaning);
@@ -46,7 +51,7 @@ function mark(button,state){
   button.dataset.result=state;
   button.prepend(el('span',state==='miss'?'× ':'✓ ','practice-mark'));
 }
-export function matching(card,exercise,submit){
+export function matching(card,exercise,submit,draft){
   const board=el('div',null,'practice-board');
   const rows=el('div',null,'practice-pairs');
   const bank=el('div',null,'practice-bank');
@@ -72,6 +77,7 @@ export function matching(card,exercise,submit){
     empty.forEach((button,i)=>button.hidden=!!slots[i].querySelector('.meaning-card'));
     select(null);
     check.disabled=empty.some(button=>!button.hidden);
+    draft?.change(slots.map(slot=>cards.indexOf(slot.querySelector('.meaning-card'))));
     tile.focus({preventScroll:true});
     if(!matchMedia('(prefers-reduced-motion: reduce)').matches){
       const after=tile.getBoundingClientRect();
@@ -145,6 +151,10 @@ export function matching(card,exercise,submit){
   check.onclick=()=>{select(null);submit(slots.map(slot=>cards.indexOf(slot.querySelector('.meaning-card'))));};
   board.append(rows,bank);
   card.append(el('p','Drag each meaning into its slot, or select a card and then a slot.'),board,check);
+  if(draft){
+    check.remove();
+    draft.answers.forEach((answer,i)=>{if(answer>=0){slots[i].append(cards[answer]);empty[i].hidden=true;}});
+  }
   return feedback=>{
     check.hidden=true;
     feedback.forEach((result,i)=>{

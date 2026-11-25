@@ -1,6 +1,6 @@
 import {el} from './ui.js';
 
-export function summaryHeading(label,title,metrics,tags){
+export function summaryHeading(label,title,metrics,tags,celebrate=true){
   const heading=el('header',null,'summary-heading');
   const celebration=el('div',null,'summary-celebration');
   const mascot=el('img');mascot.src='/baobao.png';mascot.alt='Bāobāo smiling and waving';
@@ -16,7 +16,8 @@ export function summaryHeading(label,title,metrics,tags){
     }
   }
   const complete=el('p',label,'summary-complete');
-  heading.append(celebration,complete,el('h1',title));
+  if(celebrate)heading.append(celebration);
+  heading.append(complete,el('h1',title));
   if(tags)heading.append(tags);
   const stats=el('dl',null,'summary-stats');
   function stat(value,label){

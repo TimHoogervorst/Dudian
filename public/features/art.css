@@ -8,7 +8,6 @@
 .cover-tools textarea { width:100%; min-height:6rem; }
 .story-settings [hidden] { display:none; }
 .page-introduction .cover-scene { display:block; width:auto; max-width:100%; height:auto; max-height:clamp(15rem,36vh,23rem); margin:1rem auto; background:transparent; }
-main:has(.page-introduction .reader-grid) { padding-top:clamp(14px,1.4vw,22px); }
 .cover-reading-actions { text-align:center; border-block:1px solid var(--line); padding:.75rem; }
 .cover-reading-actions .cover-tools { margin:.6rem 0 0; font-size:.9rem; }
 .page-introduction .reader-center { min-width:0; }

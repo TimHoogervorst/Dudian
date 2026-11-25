@@ -197,8 +197,16 @@ function previewFor(plan:StoryPlan,chapters:Chapter[]) {
 export type GenerationStage = 'planning'|'writing'|'checking'|'revising'|'questions'|'saving';
 export async function generateStory(store:ReadingStore,plan:StoryPlan,write:CandidateWriter=generateText,
   report:(stage:GenerationStage,detail?:string)=>void=()=>{}) {
+  const story=await generateReading(plan,write,planWordReviews(store,plan),report);
+  report('saving');
+  store.saveStory(story);
+  return story;
+}
+
+// Exam readings use the same writer and validation without creating a Library story.
+export async function generateReading(plan:StoryPlan,write:CandidateWriter,rounds:ReturnType<typeof planWordReviews>=[],
+  report:(stage:GenerationStage,detail?:string)=>void=()=>{},examTargets?:string[]){
   const dictionary = lexicon(plan);
-  const rounds=planWordReviews(store,plan);
   const instructions=[promptFor(plan,dictionary),...rounds.map(({chapter,words})=>
     'Use each of these word-review targets as a segmented word by the end of chapter '+(chapter+1)+': '+words.join(', ')+'.')].join('\n');
   let prompt = instructions;
@@ -230,11 +238,9 @@ export async function generateStory(store:ReadingStore,plan:StoryPlan,write:Cand
         preview:{...previewFor(plan,accepted.chapters),wordReview}};
       report('questions');
       for(const section of story.chapters){
-        section.questions=await generateQuestions(section,plan,[...dictionary.keys(),...(section.paragraphs.some(p=>p.some(t=>t.cast))?['包包']:[]),...section.names??[]],write);
+        section.questions=await generateQuestions(section,plan,[...dictionary.keys(),...(section.paragraphs.some(p=>p.some(t=>t.cast))?['包包']:[]),...section.names??[]],write,examTargets);
       }
       rounds.forEach(({chapter,words},i)=>story.chapters[chapter].questions!.push(...wordReviewCards(story.chapters,chapter,words,i+1)));
-      report('saving');
-      store.saveStory(story);
       return story;
     } catch (error) {
       if (!(error instanceof CandidateError)) throw error;

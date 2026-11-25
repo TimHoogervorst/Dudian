@@ -1,4 +1,5 @@
 import {api,el,link,ui} from './ui.js';
+import {addSpeaker} from './reader-audio.js';
 import {readerLayout,reviewHref,addCheckmark,markCompleted} from './reader-layout.js';
 
 export async function reviewPage({root,story,position,round,signal,onLeave}){
@@ -33,12 +34,13 @@ export async function reviewPage({root,story,position,round,signal,onLeave}){
       const ruby=el('ruby',q.prompt.zh);ruby.append(el('rt',q.prompt.pinyin));word.replaceChildren(ruby);
     }
     card.append(el('p','Card '+(number+1)+' of '+cards.length,'overline'),word);
+    addSpeaker(card,'Listen to word and meanings',[{text:q.prompt.zh},...q.choices.map(c=>({text:c.en,lang:'en-US'}))],signal);
     const choices=el('div',null,'check-choices');
     q.choices.forEach((choice,i)=>{
       const button=el('button',choice.en);
       button.onclick=async()=>{
         if(pending)return;
-        const enabled=panel.querySelectorAll('button:enabled');
+        const enabled=panel.querySelectorAll('.check-choices button:enabled');
         enabled.forEach(b=>b.disabled=true);
         try{
           pending=api(endpoint,{action:'answer',question:index,choice:i});
@@ -58,7 +60,7 @@ export async function reviewPage({root,story,position,round,signal,onLeave}){
     const elements=panel.querySelectorAll('.word-review-card');
     updated.forEach((q,number)=>{
       const card=elements[number];
-      const buttons=card.querySelectorAll('button');
+      const buttons=card.querySelectorAll('.check-choices button');
       buttons.forEach((button,i)=>{
         button.disabled=q.choice!==null;
         if(q.correct===i)button.className='check-correct';

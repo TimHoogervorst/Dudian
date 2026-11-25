@@ -67,6 +67,18 @@ export class ReadingStore {
         for(const row of this.db.prepare('SELECT text FROM item_encounters').all())
           for(const char of String(row.text))if(/\p{Script=Han}/u.test(char))insert.run(char);
       }
+      if(!exists.get('milestone_passes')){
+        this.db.exec(`CREATE TABLE milestone_passes(level INTEGER PRIMARY KEY);
+          INSERT INTO milestone_passes SELECT DISTINCT level FROM milestone_tests WHERE status='passed';
+          CREATE TRIGGER record_milestone_pass AFTER UPDATE OF status ON milestone_tests WHEN NEW.status='passed'
+            BEGIN INSERT OR IGNORE INTO milestone_passes VALUES(NEW.level); END;
+          CREATE TRIGGER import_milestone_pass AFTER INSERT ON milestone_tests WHEN NEW.status='passed'
+            BEGIN INSERT OR IGNORE INTO milestone_passes VALUES(NEW.level); END;
+          DROP INDEX milestone_active;
+          CREATE UNIQUE INDEX milestone_active ON milestone_tests(level) WHERE status IN ('ready','active');
+          ALTER TABLE milestone_tests ADD COLUMN position INTEGER NOT NULL DEFAULT 0;`);
+        this.db.exec(`UPDATE milestone_tests SET position=coalesce(json_extract(answers,'$[#-1].section'),0) WHERE status='active'`);
+      }
       this.db.exec('COMMIT');
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }

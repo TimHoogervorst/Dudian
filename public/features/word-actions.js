@@ -1,3 +1,4 @@
+import {readingWord} from '../reader-layout.js';
 import {api,el,link} from '../ui.js';
 import {icon} from '../icons.js';
 
@@ -89,7 +90,7 @@ export function setup(ui) {
       span.onfocus=()=>action(span,'preview');
       span.tabIndex=0;span.setAttribute('role','button');span.setAttribute('aria-label','Look up '+token.text);
       if(pinyin && token.pinyin) {
-        const ruby=el('ruby',token.text);ruby.append(el('rt',token.pinyin));span.replaceChildren(ruby);
+        span.replaceChildren(readingWord(token,pinyin));
       }
       span.onclick=()=>tap(span);
       span.onkeydown=e=>{

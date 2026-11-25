@@ -8,6 +8,7 @@ import {strengthFor} from './strength.ts';
 import {storyFocus} from './story-scoring.ts';
 import type {PreviewItem} from './store.ts';
 import {markAdvance} from './activity.ts';
+import {prepareMilestones} from './milestone-test.ts';
 import {initializeGeneration} from './generation-job.ts';
 
 const root = fileURLToPath(new URL('../',import.meta.url));
@@ -40,8 +41,20 @@ export async function createApp(store: ReadingStore) {
     const feature = await import(pathToFileURL(join(root,'src/features',file)).href);
     if (typeof feature.default === 'function') features.push(feature.default);
   }
+  // Ordinary reader requests can change eligibility. Only rescan the curriculum
+  // when a score change has been recorded.
+  const changes=store.db.prepare('SELECT coalesce(max(rowid),0) AS scores FROM score_changes');
+  let last=changes.get()!;
+  prepareMilestones(store.db);
   return createServer(async (req,res)=>{
     function json(status:number,value:unknown) {
+      if(req.method==='POST'&&status<300){
+        const now=changes.get()!;
+        if(now.scores!==last.scores||/^\/api\/milestone-tests\/[^/]+\/(submit|discard)$/.test(req.url??'')){
+          prepareMilestones(store.db);
+          last=now;
+        }
+      }
       res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
       res.end(JSON.stringify(value));
     }

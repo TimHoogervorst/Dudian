@@ -17,7 +17,9 @@
 .roadmap-summary section+section{border-left:1px solid var(--line);padding-left:1.3rem}
 .roadmap-summary h2{margin:0;font-size:1.14rem}
 .roadmap-summary p{margin:.35rem 0 0;font-family:var(--sans)}
-.roadmap-summary .hsk-progress-track{margin:0}
+.test-preparation{display:grid;gap:.4rem;width:min(100%,22rem);color:var(--muted);font:.88rem var(--sans)}
+.test-preparation progress{width:100%;height:.5rem;accent-color:var(--red)}
+.test-result-link{display:block;width:fit-content;font:.9rem var(--sans);margin-top:.45rem}
 .milestone-group{margin-top:2rem}
 .milestone-group ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,11.8rem),1fr));gap:.75rem;padding:0;list-style:none}
 .milestone-group li{display:flex;flex-direction:column;gap:.6rem;min-height:7.8rem;border:1px solid var(--line);border-radius:.65rem;padding:1rem;background:#fff8eb}

@@ -4,112 +4,185 @@ import {catalog} from './catalog.ts';
 import {HttpError} from './store.ts';
 import {generateText} from './provider.ts';
 import {milestoneProgress} from './milestone-progress.ts';
-import {milestoneExercises,checkExercise,type Exercise} from './practice-exercises.ts';
+import {exerciseView,planMilestoneWordPractice,type Exercise} from './practice-exercises.ts';
 
-type Line={text:string;pinyin:string};
-type Question={prompt:Line;choices:Line[];correct:number;explanation:string};
-type Section={title:string;kind:string;lines:Line[];questions:Question[];exercises:Exercise[]};
+import {generateReading} from './story-generation.ts';
+import {readingSize} from './story-plan.ts';
+import {articleDocuments,milestones,readingOptions,type ReadingFormat} from './reading-types.ts';
+import {dictionaryTokens} from './cover-text.ts';
+import type {QuizText,Token} from './store.ts';
+
+type Word=Pick<Token,'text'|'pinyin'>;
+type Line=Word & {tokens?:Word[]};
+type Question={prompt:Line;choices:Line[];correct:number};
+type Section={title:string;kind:string;lines:Line[];questions:Question[];exercises:Exercise[];
+  names?:string[];speakers?:number[];sections?:string[]};
 type Submitted={section:number;task:number;answers:number[]};
-const kinds=['Book','Article','Dialogue'];
-const nonempty=(value:unknown):value is string=>typeof value==='string'&&!!value.trim();
-const line=(value:Line)=>value&&nonempty(value.text)&&nonempty(value.pinyin);
 
-async function generateSections(level:number,generate:typeof generateText){
-  const words=catalog.list('word',level);
-  const targets=new Set<string>();
-  while(targets.size<18)targets.add(words[randomInt(words.length)].text);
-  const focus=[...targets];
-  const plan=Array.from({length:9},(_,i)=>({kind:kinds[i%3],targets:focus.slice(i*2,i*2+2)}));
-  const raw=await generate(`Write nine fresh, independent Mandarin reading passages for an HSK ${level} milestone test.
-  Follow this ordered plan: ${JSON.stringify(plan)}. Use simple natural vocabulary through HSK ${level}.
-  For each Book write a short narrative, each Article a real-world document, each Dialogue a conversation with speakers.
-  Include both assigned words verbatim in the passage and test comprehension of each in context with one Chinese question.
-  Return a JSON array. Each entry is {"title":"short Chinese title","lines":[{"text":"Chinese sentence or speaker turn","pinyin":"tone-marked pinyin"}],
-  "questions":[{"prompt":{"text":"Chinese","pinyin":"..."},"choices":[{"text":"Chinese","pinyin":"..."}],"correct":0,"explanation":"English explanation using the passage"}]}.
-  Supply two questions per passage, each with four distinct plausible choices and a zero-based correct index. No English in passages or choices.`);
-  const readings=JSON.parse(raw.trim().replace(/^\x60{3}(?:json)?\s*|\s*\x60{3}$/gi,'')) as Section[];
-  if(!Array.isArray(readings)||readings.length!==9)throw Error('The generated test was incomplete. Generate it again.');
-  const exercises=milestoneExercises(level);
+function readingLine(tokens:Word[]):Line{
+  return {text:tokens.map(t=>t.text).join(''),tokens:tokens.map(({text,pinyin})=>({text,pinyin}))};
+}
+
+function sample(words:string[],count:number){
+  const pool=[...words];
+  return Array.from({length:Math.min(count,pool.length)},()=>pool.splice(randomInt(pool.length),1)[0]);
+}
+
+async function generateSections(level:number,generate:typeof generateText,report:(completed:number)=>void){
+  const readingLevel=Math.min(6,level+1);
+  const targets=sample(catalog.list('word',level).map(w=>w.text),18);
+  // Keep common function words available and the sense-numbered glossary within a single chapter prompt.
+  const background=catalog.list('word',1).map(w=>w.text);
+  for(let band=2;band<=readingLevel;band++)background.push(...sample(catalog.list('word',band).map(w=>w.text),40));
+  const strongCharacters=new Set(catalog.list('character').filter(c=>c.level<=level).map(c=>c.text)).size;
+  const formatLevel=Math.max(...Object.values(milestones).flat().map(([,threshold])=>threshold).filter(n=>n<level));
+  const documents=articleDocuments(formatLevel,3);
   const sections:Section[]=[];
-  readings.forEach((r,i)=>{
-    if(!r||!nonempty(r.title)||!Array.isArray(r.lines)||!r.lines.length||!r.lines.every(line)||
-      !plan[i].targets.every(word=>r.lines.some(l=>l.text.includes(word)))||
-      !Array.isArray(r.questions)||r.questions.length!==2||!r.questions.every(q=>q&&line(q.prompt)&&
-        Array.isArray(q.choices)&&q.choices.length===4&&q.choices.every(line)&&new Set(q.choices.map(c=>c.text)).size===4&&
-        Number.isInteger(q.correct)&&q.correct>=0&&q.correct<4&&nonempty(q.explanation)))
-      throw Error('A generated passage or question was incomplete. Generate the test again.');
-    sections.push({title:r.title,kind:plan[i].kind,lines:r.lines,questions:r.questions,exercises:[]});
+  const nextWordPractice=planMilestoneWordPractice(level);
+  for(let i=0;i<passagesPerTest;i++){
+    const {stage,people}=readingOptions(formatLevel);
+    const formats:ReadingFormat[]=[{type:'book',stage},{type:'article',documents:[documents[Math.floor(i/3)]]},{type:'dialogue',people}];
+    const format=formats[i%3];
+    const focus=targets.slice(i*2,i*2+2);
+    const plan={...readingSize('hard',10),format,background:[...new Set([...background,...focus])],newWords:focus,
+      strongCharacters,newCharacters:[],reviewWords:[],ceiling:0};
+    const story=await generateReading(plan,generate,[],undefined,focus);
+    const chapter=story.chapters[0];
+    const display=(part:QuizText)=>readingLine(dictionaryTokens(story,part.zh,part.words));
+    sections.push({title:chapter.title,kind:['Book','Article','Dialogue'][i%3],lines:chapter.paragraphs.map(readingLine),
+      names:chapter.names,speakers:chapter.speakers,sections:chapter.sections,
+      questions:chapter.questions!.map(q=>({prompt:display(q.prompt),choices:q.choices.map(display),correct:q.correct})),exercises:[]});
     if(i%3!==2)sections.push({title:'Word practice',kind:'Practice',lines:[],questions:[],
-      exercises:exercises.splice(0,sections.filter(s=>s.kind==='Practice').length<4?2:1)});
-  });
+      exercises:nextWordPractice()});
+    report(i+1);
+  }
   return sections;
 }
 
-const pending=new WeakMap<DatabaseSync,Promise<string>>();
+function displayLine(line:Line){
+  // Earlier attempts stored a sentence-wide pronunciation. Recover ordinary reader word boundaries.
+  if(line.tokens)return line;
+  const words=dictionaryTokens({chapters:[]},line.text);
+  // Preserve the original tones (including neutral particles) when the saved
+  // pronunciation aligns with the recovered words, even if its spacing differs.
+  const letters=(s:string)=>s.normalize('NFC').match(/\p{L}/gu)??[];
+  const base=(s:string)=>s.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase();
+  const original=letters(line.pinyin??'');
+  const readings=words.map(w=>letters(w.pinyin??'').join(''));
+  if(base(readings.join(''))===base(original.join(''))){
+    let offset=0;
+    words.forEach((w,i)=>{
+      const end=offset+readings[i].length;
+      if(end>offset)w.pinyin=original.slice(offset,end).join('');
+      offset=end;
+    });
+  }
+  return readingLine(words);
+}
+
+const passagesPerTest=9;
+type PreparationJob={completed:number;work:Promise<string>};
+const jobs=new WeakMap<DatabaseSync,Map<number,PreparationJob>>();
+const failures=new WeakMap<DatabaseSync,Set<number>>();
+function active(db:DatabaseSync,level:number){
+  return db.prepare("SELECT id,status FROM milestone_tests WHERE level=? AND status IN ('ready','active')").get(level);
+}
 export async function generateTest(db:DatabaseSync,level:number,generate=generateText){
   if(!Number.isInteger(level)||level<1||level>6)throw new HttpError(400,'Choose an HSK level from 1 to 6.');
   const progress=milestoneProgress(db);
-  if(progress.milestone!==level||progress.missing.length)throw new HttpError(409,'Complete the milestone requirements first.');
-  if(progress.attempt&&progress.attempt.status!=='failed')return String(progress.attempt.id);
-  const running=pending.get(db);
-  if(running)return running;
-  const work=generateSections(level,generate).then(sections=>{
-    const id=randomUUID();
-    db.prepare("INSERT OR IGNORE INTO milestone_tests(id,level,status,sections) VALUES(?,?,'ready',?)").run(id,level,JSON.stringify(sections));
-    return String(db.prepare("SELECT id FROM milestone_tests WHERE level=? AND status!='failed'").get(level)!.id);
-  });
-  pending.set(db,work);
-  try{return await work;}finally{pending.delete(db);}
+  if(level>progress.passed&&progress.milestone!==level)throw new HttpError(409,'Complete the milestone requirements first.');
+  const current=active(db,level);
+  if(current)return String(current.id);
+  const pending=jobs.get(db)??new Map<number,PreparationJob>();
+  jobs.set(db,pending);
+  const running=pending.get(level);
+  if(running)return running.work;
+  const failed=failures.get(db)??new Set<number>();
+  failures.set(db,failed);
+  failed.delete(level);
+  const work=generateSections(level,generate,completed=>{job.completed=completed;}).then(sections=>{
+    db.prepare("INSERT OR IGNORE INTO milestone_tests(id,level,status,sections) VALUES(?,?,'ready',?)").run(randomUUID(),level,JSON.stringify(sections));
+    return String(active(db,level)!.id);
+  }).catch(error=>{failed.add(level);throw error;}).finally(()=>pending.delete(level));
+  const job:PreparationJob={completed:0,work};
+  pending.set(level,job);
+  return work;
 }
-
+export function prepareMilestones(db:DatabaseSync,generate=generateText){
+  const progress=milestoneProgress(db);
+  const levels=Array.from({length:progress.passed},(_,i)=>i+1);
+  if(progress.milestone)levels.push(progress.milestone);
+  for(const level of levels){
+    if(!active(db,level)&&!jobs.get(db)?.has(level)&&!failures.get(db)?.has(level))void generateTest(db,level,generate).catch(()=>{});
+  }
+}
+export function preparation(db:DatabaseSync,level:number){
+  const job=jobs.get(db)?.get(level);
+  return {completed:job?.completed??0,total:passagesPerTest,attempt:active(db,level),failed:failures.get(db)?.has(level)??false};
+}
 function load(db:DatabaseSync,id:string){
   const row=db.prepare('SELECT * FROM milestone_tests WHERE id=?').get(id);
   if(!row)throw new HttpError(404,'Milestone test not found.');
-  return {id,level:Number(row.level),status:String(row.status),mistakes:Number(row.mistakes),
+  return {id,level:Number(row.level),status:String(row.status),position:Number(row.position),
     sections:JSON.parse(String(row.sections)) as Section[],answers:JSON.parse(String(row.answers)) as Submitted[]};
 }
-function tasks(sections:Section[]){
-  return sections.flatMap((s,section)=>Array.from({length:s.questions.length+s.exercises.length},(_,task)=>({section,task})));
+function items(section:Section,task:number){
+  const q=section.questions[task];
+  if(q)return [{text:q.prompt.text,options:q.choices.map(c=>c.text),meaning:q.choices[q.correct].text}];
+  const e=section.exercises[task];
+  return e.targets.map(t=>({text:t.text,options:e.options,meaning:t.meaning}));
 }
-function feedback(s:Section,task:number,answers:number[]){
-  if(s.exercises.length)return checkExercise(s.exercises[task],answers).map(result=>({...result,explanation:result.text+' means '+result.meaning+'.'}));
-  const q=s.questions[task];
-  if(!Array.isArray(answers)||answers.length!==1||!Number.isInteger(answers[0])||!q.choices[answers[0]])
-    throw new HttpError(400,'Choose one answer.');
-  return [{text:q.prompt.text,chosen:q.choices[answers[0]].text,meaning:q.choices[q.correct].text,correct:answers[0]===q.correct,explanation:q.explanation}];
+function grade(a:ReturnType<typeof load>){
+  const review=a.sections.flatMap((s,section)=>Array.from({length:s.questions.length+s.exercises.length},(_,task)=>{
+    const draft=a.answers.find(d=>d.section===section&&d.task===task);
+    return items(s,task).flatMap(({text,options,meaning},i)=>{
+      const chosen=options[draft?.answers[i]??-1]??null;
+      return chosen===meaning?[]:[{section,task,text,chosen,meaning}];
+    });
+  }).flat());
+  const unanswered=review.filter(r=>r.chosen===null).length;
+  return {review,unanswered,mistakes:review.length-unanswered};
 }
 export function testView(db:DatabaseSync,id:string){
   const a=load(db,id);
-  const view={id,level:a.level,status:a.status,mistakes:a.mistakes,index:a.answers.length,
-    outline:a.sections.map(({kind,title,questions,exercises})=>({kind,title,count:questions.length+exercises.length}))};
-  if(a.status==='ready')return view;
-  if(a.status!=='active')return {...view,review:a.answers.flatMap(({section,task,answers})=>
-    feedback(a.sections[section],task,answers).map(result=>({...result,section})))};
-  const {section,task}=tasks(a.sections)[a.answers.length];
-  const s=a.sections[section],q=s.questions[task],e=s.exercises[task];
-  return {...view,section,task,lines:s.lines,question:q?{prompt:q.prompt,choices:q.choices}:null,
-    exercise:e?{type:e.type,targets:e.targets.map(({text,pinyin})=>({text,pinyin})),options:e.options}:null};
+  const view={id,level:a.level,status:a.status,position:a.position,answers:a.answers,
+    practiceRetake:a.status==='active'&&!!db.prepare('SELECT 1 FROM milestone_passes WHERE level=?').get(a.level),
+    sections:a.sections.map(s=>({kind:s.kind,title:s.title,lines:s.lines.map(displayLine),names:s.names,speakers:s.speakers,sections:s.sections,
+      tasks:[...s.questions.map(q=>({prompt:displayLine(q.prompt),targets:[],options:q.choices.map(displayLine)})),
+        ...s.exercises.map(e=>({prompt:null,...exerciseView(db,e)}))]}))};
+  if(a.status==='failed'||a.status==='passed')return {...view,...grade(a)};
+  return view;
 }
 export function startTest(db:DatabaseSync,id:string){
-  db.prepare("UPDATE milestone_tests SET status='active' WHERE id=? AND status='ready'").run(id);
+  db.prepare("UPDATE milestone_tests SET status='active',position=-1 WHERE id=? AND status='ready'").run(id);
   return testView(db,id);
 }
-export function submitTest(db:DatabaseSync,id:string,index:number,answers:number[]){
-  db.exec('BEGIN IMMEDIATE');
-  try{
-    const a=load(db,id);
-    const sequence=tasks(a.sections);
-    if(index===a.answers.length&&a.status==='active'){
-      const {section,task}=sequence[index];
-      const mistakes=a.mistakes+feedback(a.sections[section],task,answers).filter(item=>!item.correct).length;
-      a.answers.push({section,task,answers});
-      const status=mistakes>3?'failed':a.answers.length===sequence.length?'passed':'active';
-      db.prepare('UPDATE milestone_tests SET status=?,mistakes=?,answers=? WHERE id=?').run(status,mistakes,JSON.stringify(a.answers),id);
-    }else if(!Number.isInteger(index)||!a.answers[index]||JSON.stringify(a.answers[index].answers)!==JSON.stringify(answers)){
-      throw new HttpError(409,'Reopen the current test question.');
-    }
-    const view=testView(db,id);
-    db.exec('COMMIT');
-    return view;
-  }catch(error){db.exec('ROLLBACK');throw error;}
+export function saveDraft(db:DatabaseSync,id:string,section:number,task?:number,answers?:number[]){
+  const a=load(db,id);
+  if(a.status!=='active')throw new HttpError(409,'This test is closed.');
+  if(!Number.isInteger(section)||section< -1||section>a.sections.length)throw new HttpError(400,'Unknown section.');
+  if(task!==undefined){
+    const s=a.sections[section];
+    if(!s||!Number.isInteger(task)||task<0||task>=s.questions.length+s.exercises.length)throw new HttpError(400,'Unknown question.');
+    const rows=items(s,task);
+    if(!Array.isArray(answers)||answers.length!==rows.length||answers.some((v,i)=>!Number.isInteger(v)||v< -1||v>=rows[i].options.length))
+      throw new HttpError(400,'Invalid answer.');
+    const filled=answers.filter(v=>v>=0);
+    if(new Set(filled).size!==filled.length)throw new HttpError(400,'Choose a distinct meaning for each word.');
+    a.answers=a.answers.filter(d=>d.section!==section||d.task!==task);
+    a.answers.push({section,task,answers});
+  }
+  db.prepare('UPDATE milestone_tests SET position=?,answers=? WHERE id=?').run(section,JSON.stringify(a.answers),id);
+}
+export function submitTest(db:DatabaseSync,id:string){
+  const a=load(db,id);
+  if(a.status==='ready')throw new HttpError(409,'Start this test first.');
+  if(a.status==='active'){
+    const {mistakes,unanswered}=grade(a);
+    db.prepare('UPDATE milestone_tests SET status=?,mistakes=? WHERE id=?').run(unanswered||mistakes>3?'failed':'passed',mistakes,id);
+  }
+  return testView(db,id);
+}
+export function discardTest(db:DatabaseSync,id:string){
+  db.prepare('DELETE FROM milestone_tests WHERE id=?').run(id);
 }

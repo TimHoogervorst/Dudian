@@ -1,4 +1,4 @@
-import {el,link,api,ui} from './ui.js';
+import {el,link} from './ui.js';
 export function displayLevel(level){
   return level>0 && level<0.01?'<0.01':String(Math.floor(level*100)/100);
 }
@@ -20,30 +20,16 @@ export function readingProgress(level,projected,state={}){
   for(const i of [start,milestone]){
     const tick=el('span',String(i));tick.style.left=(i-start)*100+'%';labels.append(tick);
   }
-  panel.append(heading,track,labels);
-  if(state.passed)panel.append(el('p','HSK '+state.passed+' passed','hsk-milestone'));
+  panel.append(heading,track);
   if(state.milestone){
-    panel.append(el('p','HSK '+state.milestone+' milestone reached','hsk-milestone'));
-    const missing=state.missing.length,attempt=state.attempt;
-    if(attempt&&attempt.status!=='failed'){
-      panel.append(link(attempt.status==='ready'?'Start test':'Continue test','#/milestone/'+attempt.id,'button'));
-    }else{
-      const label=missing?'Practice '+missing+' unseen character'+(missing===1?'':'s'):attempt?'Generate new test':'Generate test';
-      const action=el('button',label,'button');
-      action.onclick=async()=>{
-        action.disabled=true;
-        action.textContent=missing?'Preparing practice…':'Generating test…';
-        try{
-          const result=missing?await api('/api/practice/sets',{kind:'character',level:state.milestone,words:state.missing}):
-            await api('/api/milestone-tests',{level:state.milestone});
-          if(action.isConnected)ui.navigate((missing?'/exercises/':'/milestone/')+result.id);
-        }catch(error){ui.notice(error.message);}
-        finally{action.disabled=false;action.textContent=label;}
-      };
-      panel.append(action);
-      if(attempt)panel.append(link('Review last attempt','#/milestone/'+attempt.id,'text-link'));
-    }
-  }else if(level<6)panel.append(el('p','Next milestone: HSK '+milestone,'hsk-milestone'));
+    const note=el('div',null,'hsk-milestone milestone-link');
+    note.append(el('span','HSK '+state.milestone+' milestone reached'),link('Take test →','#/progression/'+state.milestone));
+    panel.append(note);
+  }else{
+    panel.append(labels);
+    if(state.passed)panel.append(el('p','HSK '+state.passed+' passed','hsk-milestone'));
+    else if(level<6)panel.append(el('p','Next milestone: HSK '+milestone,'hsk-milestone'));
+  }
   if(projected!==undefined){
     const gain=Math.max(0,projected-level);
     const delta=gain>0 && gain<0.0001?'<0.0001':Number(gain.toFixed(4));

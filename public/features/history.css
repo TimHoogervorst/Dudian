@@ -57,6 +57,7 @@ main:has(.page-stories){max-width:110rem;padding-inline:clamp(1rem,2vw,2.5rem)}
 
 .hsk-progress-labels{position:relative;height:1.25rem;margin:.35rem .25rem 0;color:var(--muted);font:.78rem var(--sans)}
 .hsk-progress-labels span{position:absolute;transform:translateX(-50%)}
+.milestone-link{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:.35rem .75rem}.hsk-progress .milestone-link{margin-top:.6rem;border:0;padding:0}.milestone-link a{white-space:nowrap}
 .hsk-milestone{border-top:1px solid var(--line);padding-top:.55rem;margin:.2rem 0;font:600 .94rem var(--sans)}
 .dashboard-overview{grid-template-columns:minmax(0,2.4fr) minmax(16rem,1fr);gap:.85rem}
 .dashboard-stats{display:grid;grid-template-rows:auto auto;gap:.65rem;min-width:0}

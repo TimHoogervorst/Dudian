@@ -1,8 +1,7 @@
-import {storedExample} from './flashcard-example.ts';
 import {randomUUID} from 'node:crypto';
 import type {DatabaseSync} from 'node:sqlite';
 import {ensureReviewSchema,readSession,recordReview} from './flashcards.ts';
-import {candidates,checkExercise,planExercises,type Exercise,type PracticeRequest} from './practice-exercises.ts';
+import {candidates,checkExercise,exerciseView,planExercises,type Exercise,type PracticeRequest} from './practice-exercises.ts';
 import {HttpError} from './store.ts';
 import {strengthFor,adjustStrength} from './strength.ts';
 import {seeItem} from './encounters.ts';
@@ -45,9 +44,7 @@ export function practiceView(db:DatabaseSync,id:string){
   const set=load(db,id);
   const index=set.answers.length;
   const current=set.exercises[index];
-  const first=current?.targets[0];
-  const example=current?.type==='choice'?storedExample(db,first.kind,first.text,first):undefined;
-  const exercise=current?{type:current.type,options:current.options,example,targets:current.targets.map(({text,pinyin})=>({text,pinyin}))}:null;
+  const exercise=current?exerciseView(db,current):null;
   const remainingDue=!current&&!set.request.words?candidates(db,set.request.level??1,visited(set))
     .filter(i=>Number.isFinite(i.due)&&(set.request.kind==='mixed'||set.request.kind===(Array.from(i.text).length===1?'character':'word'))).length:0;
   const testedTargets=current?[]:set.exercises.flatMap(ex=>ex.targets);

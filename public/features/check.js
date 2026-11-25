@@ -1,3 +1,4 @@
+import {questionCard} from '../question-card.js';
 import {markCompleted,reviewHref} from '../reader-layout.js';
 
 export function setup(ui){
@@ -77,10 +78,8 @@ export async function mountCheck(ui,context){
     const firstReview=state.questions.findIndex(q=>q.reviewRound);
     state.questions.forEach((q,i)=>{
       if(q.reviewRound)return;
-      const card=el('section',null,'check-card');
-      const prompt=el('h2');
-      prompt.append(chinese(q.prompt,true));
-      card.append(el('p','Question '+(i+1)+' of '+comprehension.length,'overline'),prompt);
+      const {card,prompt}=questionCard({number:i+1,total:comprehension.length,title:chinese(q.prompt,true),
+        audio:[q.prompt,...q.choices].map(item=>({text:item.zh})),signal});
       const translation=el('details',null,'paragraph-translation check-translation');
       translation.lang='en';
       translation.open=visibleTranslations.has(i);

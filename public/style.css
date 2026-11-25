@@ -42,7 +42,7 @@ button:disabled{opacity:.5}
 .chapter-number{font:600 .8em var(--sans);font-variant-numeric:tabular-nums}
 .text-link{font:600 .85rem var(--sans);color:var(--muted)}
 .chapter-heading{text-align:center}.chapter-heading h1{font-size:clamp(32px,3.3vw,54px)}
-main:has(.page-read){padding-top:clamp(14px,1.4vw,22px)}
+main:has(.reader-grid){padding-top:clamp(14px,1.4vw,22px)}
 .chapter-heading .overline{margin-bottom:4px}
 .chapter-heading h1{margin:0 0 .35em}
 .chapter-text{font-family:"Noto Serif CJK SC","Songti SC","SimSun",serif;font-size:clamp(25px,2.15vw,35px);line-height:1.8;letter-spacing:.045em}

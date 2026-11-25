@@ -1,19 +1,31 @@
 import type {Context} from '../server.ts';
-import {generateTest,startTest,submitTest,testView} from '../milestone-test.ts';
+import {generateTest,startTest,submitTest,testView,saveDraft,discardTest,preparation} from '../milestone-test.ts';
+import {HttpError} from '../store.ts';
 
 export default async function milestones({store,url,req,body,json}:Context){
+  const db=store.db;
   if(url.pathname==='/api/milestone-tests'&&req.method==='POST'){
-    json(200,{id:await generateTest(store.db,(await body()).level)});
+    json(200,{id:await generateTest(db,(await body()).level)});
     return true;
   }
-  const route=url.pathname.match(/^\/api\/milestone-tests\/([a-f0-9-]+)(?:\/(start|submit))?$/);
+  if(url.pathname==='/api/milestone-tests/preparation'&&req.method==='GET'){
+    json(200,preparation(db,Number(url.searchParams.get('level'))));
+    return true;
+  }
+  const route=url.pathname.match(/^\/api\/milestone-tests\/([a-f0-9-]+)(?:\/(start|draft|submit|discard))?$/);
   if(!route)return false;
   const [,id,action]=route;
-  if(!action&&req.method==='GET')json(200,testView(store.db,id));
-  else if(action==='start'&&req.method==='POST')json(200,startTest(store.db,id));
-  else if(action==='submit'&&req.method==='POST'){
-    const {index,answers}=await body();
-    json(200,submitTest(store.db,id,index,answers));
-  }else return false;
+  if(!action&&req.method==='GET')json(200,testView(db,id));
+  else if(req.method!=='POST')return false;
+  else if(action==='start')json(200,startTest(db,id));
+  else if(action==='draft'){
+    const {section,task,answers}=await body();
+    saveDraft(db,id,section,task,answers);
+    json(200,{});
+  }else if(action==='submit'){
+    if((await body()).confirm!==true)throw new HttpError(400,'Confirm final submission.');
+    json(200,submitTest(db,id));
+  }else if(action==='discard'){discardTest(db,id);json(200,{});}
+  else return false;
   return true;
 }

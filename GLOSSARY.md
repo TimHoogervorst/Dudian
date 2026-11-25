@@ -85,8 +85,12 @@ A Library practice exercise in which the learner pairs Chinese entries with thei
 
 **Milestone test**
 
-A generated assessment available once a learner has reached a whole HSK level and encountered every character assigned to it. Passing it allows the progress bar to advance beyond that level.
+A generated assessment available once a learner has reached a whole HSK level. Passing it allows the progress bar to advance beyond that level.
 
 **Test section**
 
 One part of a milestone test. A reading section contains a Book passage, Article, or Dialogue with a comprehension check. A word-practice section contains vocabulary exercises.
+
+**Practice retake**
+
+A fresh milestone test taken for practice at an HSK level the learner has already passed. Its result leaves the earned pass, HSK progress, and reading strength unchanged.

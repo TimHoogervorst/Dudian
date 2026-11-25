@@ -59,12 +59,16 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
   return preferences;
 }
 
+export function readingSize(difficulty:Difficulty,minutes:StoryLength){
+  const chapterCount=chapterCounts[minutes];
+  const [min,max]=paragraphCounts[difficulty];
+  return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40};
+}
+
 export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: StoryLength,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
   if (!difficulties.includes(difficulty) || !validLength(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
   const chapterCount=chapterCounts[minutes];
   const ceiling=lengthBudget(getPreferences(store).ceilings[difficulty],chapterCount);
   const focusLimit=lengthBudget(storyDifficulty[difficulty].focusCards,chapterCount);
-  const [min,max]=paragraphCounts[difficulty];
-  return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40,
-    ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
+  return {...readingSize(difficulty,minutes),ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
 }

@@ -15,7 +15,7 @@ export function recoverCoverTokens(story:Story):Token[]{
 }
 
 // Older stories retained only the plain text. Prefer the readings already used in the story.
-export function dictionaryTokens(story:Story, text:string, segments?:string[]):Token[] {
+export function dictionaryTokens(story:Pick<Story,'chapters'>, text:string, segments?:string[]):Token[] {
   const known=new Map(story.chapters.flatMap(c=>c.paragraphs.flat()).filter(t=>t.entry||t.cast).map(t=>[t.text,t]));
   known.set('包包',{text:'包包',cast:'baobao',pinyin:'Bāobāo',meaning:'Our steamed-bun friend'});
   const tokens:Token[]=[];

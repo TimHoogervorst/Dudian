@@ -1,5 +1,6 @@
 import type {DatabaseSync} from 'node:sqlite';
 import {catalog,entryKind,type ItemKind} from './catalog.ts';
+import {storedExample} from './flashcard-example.ts';
 import {perfectScore} from './encounters.ts';
 import {reviewCandidates} from './strength.ts';
 import {HttpError} from './store.ts';
@@ -65,6 +66,12 @@ function meaningChoice(text:string,alternatives:string[]):Exercise{
   return {type:'choice',targets:[item],options:shuffle(choices.map(i=>i.meaning))};
 }
 
+export function exerciseView(db:DatabaseSync,exercise:Exercise){
+  const item=exercise.targets[0];
+  const example=exercise.type==='choice'?storedExample(db,item.kind,item.text,item):undefined;
+  return {type:exercise.type,options:exercise.options,example,targets:exercise.targets.map(({text,pinyin})=>({text,pinyin}))};
+}
+
 export function checkExercise(exercise:Exercise,answers:number[]){
   if(!Array.isArray(answers)||answers.length!==exercise.targets.length||new Set(answers).size!==answers.length||
      answers.some(i=>!Number.isInteger(i)||i<0||i>=exercise.options.length))
@@ -75,15 +82,17 @@ export function checkExercise(exercise:Exercise,answers:number[]){
   });
 }
 
-export function milestoneExercises(level:number){
+export function planMilestoneWordPractice(level:number){
   const options=shuffle(pool(level).filter(text=>catalog.studySense(text)));
   const remaining=new Set(options);
-  return Array.from({length:10},(_,index)=>{
-    const exercise=(index===2||index===6?matchingExercise(remaining):undefined)
-      ??meaningChoice(remaining.values().next().value!,options);
-    for(const item of exercise.targets)remaining.delete(item.text);
-    return exercise;
-  });
+  return function nextSection(){
+    return Array.from({length:10},(_,index)=>{
+      const exercise=(index===2||index===6?matchingExercise(remaining):undefined)
+        ??meaningChoice(remaining.values().next().value!,options);
+      for(const item of exercise.targets)remaining.delete(item.text);
+      return exercise;
+    });
+  };
 }
 
 export function planExercises(db:DatabaseSync,request:PracticeRequest,excluded:string[]=[],extension=false){

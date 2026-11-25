@@ -7,9 +7,9 @@ type Chapter=Story['chapters'][number];
 const segmenter=new Intl.Segmenter('zh-Hans',{granularity:'word'});
 const punctuation=/^[，。！？、；：“”‘’（）…—《》,.!?:;]+$/u;
 
-export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:string[],write:CandidateWriter) {
+export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:string[],write:CandidateWriter,examTargets?:string[]) {
   const allowed=new Set(words);
-  const count=storyDifficulty[plan.difficulty].questions;
+  const count=examTargets?.length??storyDifficulty[plan.difficulty].questions;
   const assigned=chapter.focus?new Set(chapter.focus):null;
   const targetChars=new Set([...plan.newCharacters,...plan.reviewCharacters??[]].filter(c=>!assigned||assigned.has(c)));
   const source=chapter.paragraphs.map((tokens,i)=>
@@ -20,6 +20,7 @@ export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:str
     'Each question has prompt, choices, correct (0-2), word (the exact tested Chinese word), paragraph and token (its zero-based indices in the source), and characters (explicitly tested target characters within that word, or []).',
     'For prompt and each choice use {"zh":["segmented","words"],"en":"natural English translation"}. Each zh token must be an allowed word or Chinese punctuation.',
     'Prioritize these teaching or review words where they occur: '+[...plan.newWords,...plan.reviewWords,plan.compound].filter(w=>w&&(!assigned||assigned.has(w))).join('、'),
+    ...(examTargets?['Test each of these words exactly once as the cited word: '+examTargets.join('、')]:[]),
     'Use only allowed words and participant names in prompts and choices. Cite an ordinary vocabulary word as the learning target.',
     'Eligible target characters: '+[...targetChars].join('、'),
     'Allowed words: '+words.join('、'),
@@ -62,6 +63,7 @@ export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:str
       const {questions}=JSON.parse(raw);
       if(!Array.isArray(questions)||questions.length!==count)throw Error('Expected exactly '+count+' question(s).');
       const checked=questions.map(validate);
+      if(examTargets?.some(word=>!checked.some(q=>q.word===word)))throw Error('Test every assigned word exactly once.');
       if(new Set(checked.map(q=>q.prompt.zh.replace(/[\p{P}\s]/gu,''))).size!==count)throw Error('Ask a distinct question about a different chapter detail each time.');
       return checked;
     }catch(error){

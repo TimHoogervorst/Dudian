@@ -1,7 +1,7 @@
 import {ui,el,link,api} from './ui.js';
 import {trackParagraph} from './paragraph-scroll.js';
 import {reviewPage} from './review-page.js';
-import {readerLayout,readingText,reviewHref} from './reader-layout.js';
+import {readerLayout,reviewHref} from './reader-layout.js';
 function translationToggle(saved,load,signal){
   const details=el('details',null,'paragraph-translation');
   details.lang='en';
@@ -51,31 +51,13 @@ export async function reader({root,parts,signal,onLeave}) {
     const pending=chapter.reviews?.find(r=>r.available && !r.done);
     if(pending){location.replace(reviewHref(id,position.chapter,pending.round));return;}
   }
-  const {center,aside,definition}=readerLayout(root,story,position.chapter);
-  const heading=el('header',null,'chapter-heading');
-  heading.append(el('p','Chapter '+(position.chapter+1)+' of '+story.chapters.length,'overline'),el('h1',chapter.title));
-  center.append(heading);
-  const article=readingText(chapter.paragraphs);
-  const paragraphs=Array.from(article.children);
+  const frame=readerLayout(root,story,position.chapter);
+  const {center,aside,definition}=frame;
   const baby=story.format?.stage==='Baby book';
-  const unit=baby?'Page':chapter.speakers?'Message':'Paragraph';
-  if(baby)article.classList.add('baby-pages');
-  if(chapter.speakers)article.classList.add('message-thread');
-  let step=0;
-  paragraphs.forEach((para,index)=>{
-    if(chapter.speakers){
-      const speaker=chapter.speakers[index];
-      para.classList.add(speaker===0?'outgoing':'incoming');
-      para.prepend(el('small',chapter.names[speaker]+(speaker===0?' · You':''),'message-author'));
-    }
-    const role=chapter.sections?.[index];
-    if(role){
-      para.classList.add('document-'+role);
-      if(role==='step')para.prepend(el('small','Step '+(++step),'document-label'));
-      if(role==='ingredients' && index===0)para.prepend(el('small','Ingredients','document-label'));
-    }
-    para.after(translationToggle(chapter.translations?.[index],()=>api(endpoint+'/translation',
-      {chapter:position.chapter,paragraph:index},signal),signal));
+  const {article,paragraphs,unit}=frame.chapter(chapter,{
+    label:'Chapter '+(position.chapter+1)+' of '+story.chapters.length,baby,signal,
+    translation:index=>translationToggle(chapter.translations?.[index],()=>api(endpoint+'/translation',
+      {chapter:position.chapter,paragraph:index},signal),signal)
   });
   const controls=el('div',null,'reader-controls');
   const cursor=el('div',null,'paragraph-nav');
@@ -83,7 +65,7 @@ export async function reader({root,parts,signal,onLeave}) {
   const next=el('button','→');next.setAttribute('aria-label','Next '+unit.toLowerCase());
   const where=el('span');
   cursor.append(prev,where,next);controls.append(cursor);
-  center.append(article,controls);
+  center.append(controls);
   const context={root,story,position,article,aside,definition,controls,chapter,signal,onLeave};
   const tracking=trackParagraph(()=>paragraphs.map(p=>p.getBoundingClientRect()),()=>window.innerHeight,p=>move(p,false));
   function showPosition(scroll) {

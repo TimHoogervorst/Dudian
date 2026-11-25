@@ -1,12 +1,15 @@
-.page-milestone{max-width:52rem;margin-inline:auto}
-.test-paper{padding:clamp(1rem,4vw,3rem);background:var(--paper,#fffdf6);border:1px solid #d4cec1;border-radius:1rem}
-.test-paper h2{margin-top:.5rem}
-.test-tools{display:flex;flex-wrap:wrap;gap:.5rem;margin-block:1rem}
-.test-chinese{display:grid;gap:.2rem;font-size:1.15em}
-.test-chinese small{font-size:.75em;color:#5b625e}
-.hide-pinyin .test-chinese small,.hide-pinyin .recall-pinyin{display:none}
-.test-paper .practice-options button[aria-pressed=true]{outline:3px solid currentColor}
-.test-outline{columns:2;line-height:1.8;padding-inline-start:2rem}
-.test-review{border-top:1px solid #d4cec1;padding-block:.75rem}
-.test-paper .text-link,.hsk-progress .text-link{display:inline-block;margin:.75rem}
-@media(max-width:36rem){.test-outline{columns:1}}
+.test-exercise,.test-review{border-top:1px solid var(--line);padding-block:1rem}
+.test-question:focus,.chapter-heading h1:focus{outline-offset:4px}
+.test-exercise h2{font-size:1.35rem}
+.test-question.test-word-choice{max-width:40rem;margin-inline:auto;padding:clamp(1rem,3vw,2rem) 0;text-align:center}
+.test-word-choice h2{font-size:clamp(1.6rem,2.6vw,2.6rem);margin:.4rem 0 1.25rem}
+.test-word-choice .practice-reading{clear:both}
+.test-question [aria-pressed=true]{outline:2px solid var(--red)}
+.test-question.hide-pinyin .recall-pinyin{display:none}
+.test-result{max-width:48rem;margin:auto}
+.test-warning{border-left:3px solid var(--red);padding:.75rem}
+.reader-speaker{display:inline-grid;place-items:center;width:1.8rem;height:1.8rem;float:right;margin:0 0 .4rem .7rem;padding:.35rem;color:var(--red);line-height:1;border:1px solid var(--line);border-radius:50%;background:var(--paper)}
+.reader-speaker .ui-icon{width:.95rem;height:.95rem}
+.reader-speaker[aria-pressed=true]{background:var(--red);color:white}
+.test-actions{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-block:.75rem}
+.test-retakes{margin-block:2rem}.test-retakes section{border-top:1px solid var(--line);padding-block:.5rem}

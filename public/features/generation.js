@@ -1,6 +1,7 @@
 import {readingProgress} from '../reading-progress.js';
 import {icon} from '../icons.js';
 import {coverImage,showCover} from './art.js';
+import {addSpeaker} from '../reader-audio.js';
 import {readerLayout,readingText,markCompleted} from '../reader-layout.js';
 import {el,link} from '../ui.js';
 
@@ -185,6 +186,7 @@ export function setup(ui) {
       heading.append(el('p','Introduction','overline'),el('h1',story.title));
       center.append(heading);
       const article=readingText([story.cover.tokens]);
+      addSpeaker(article.firstElementChild,'Listen to introduction',[{text:story.cover.teaser}],context.signal);
       showCover({...context,root:center},story,article);
       await ui.emit('cover-reader',{...context,story,article,aside,definition,position:{chapter:-1},onStrengthChange(text,color){
         const card=root.querySelector('.cover-focus [data-word-card="'+CSS.escape(text)+'"]');

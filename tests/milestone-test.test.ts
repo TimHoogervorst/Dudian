@@ -5,33 +5,56 @@ import {catalog} from '../src/catalog.ts';
 import {seeItem} from '../src/encounters.ts';
 import {setStrength} from '../src/strength.ts';
 import {milestoneProgress} from '../src/milestone-progress.ts';
-import {generateTest,startTest,submitTest,testView} from '../src/milestone-test.ts';
+import {discardTest,generateTest,prepareMilestones,preparation,saveDraft,startTest,submitTest,testView} from '../src/milestone-test.ts';
 import {createApp} from '../src/server.ts';
 
-const line=(text:string)=>({text,pinyin:'pīn yīn'});
 async function passages(prompt:string){
-  const plan=JSON.parse(prompt.match(/ordered plan: (\[.*\])\./)![1]);
-  return JSON.stringify(plan.map(({targets}: {targets:string[]})=>({
-    title:'早上',lines:[line(targets.join('。'))],questions:targets.map(word=>({prompt:line(word),
-      choices:['甲','乙','丙','丁'].map(line),correct:0,explanation:'The passage gives the first answer.'}))
-  })));
+  if(prompt.startsWith('Write a chapter comprehension check')){
+    const targets=prompt.match(/as the cited word: (.+)/)![1].split('、');
+    const bilingual=(zh:string)=>({zh:[zh],en:'Meaning of '+zh});
+    return JSON.stringify({questions:targets.map((word,token)=>({word,token,paragraph:0,characters:[],correct:0,
+      prompt:bilingual(word),choices:['我','你','他'].map(bilingual)}))});
+  }
+  const targets=prompt.match(/Use each teaching word at least once: (.+)/)![1].split('、');
+  const sentence=Array.from({length:30},(_,i)=>targets[i%2]+':1').concat('。');
+  if(prompt.includes('The protagonist is always'))sentence.splice(-1,0,'包包:1');
+  const people=Number(prompt.match(/array of exactly (\d+) distinct short display names/)?.[1]);
+  const document=prompt.match(/Chapter documents in order: (.+?)\./)?.[1];
+  const roles=document==='Letter'?['greeting','body','body','body','signature']:
+    document==='Recipe'?['ingredients','step','step']:['lead','report'];
+  const count=people?14:document?roles.length:3;
+  const chapter={title:'At the station',paragraphs:Array.from({length:count},()=>[sentence]),
+    translations:Array(count).fill('They arrive at the station.'),
+    names:Array.from({length:people},(_,i)=>'Name '+i),speakers:Array.from({length:count},(_,i)=>i%people),sections:roles};
+  return JSON.stringify({title:'Travel',teaser:[targets[0]+':1','。'],chapters:[chapter]});
 }
 
-test('eligibility remembers a crossed threshold and ordinary character encounters after a reset',async t=>{
+test('a reached score unlocks preparation without character encounters and reports completed passages',async t=>{
   const {db}=new ReadingStore();t.after(()=>db.close());
   const chars=catalog.libraryItems('character',1);
   for(const kind of ['character','word'] as const)
     for(const {text} of catalog.libraryItems(kind,1))setStrength(db,kind,text,'green');
   setStrength(db,'character',chars[0].text,'gray');
-  let progress=milestoneProgress(db);
+  const progress=milestoneProgress(db);
   assert.equal(progress.milestone,1);
   assert(progress.level<1);
-  assert.equal(progress.missing.length,chars.length);
-  await assert.rejects(generateTest(db,1,passages),/requirements/);
-  seeItem(db,chars.map(c=>c.text).join(''),Date.now());
-  setStrength(db,'character',chars[1].text,'gray');
-  progress=milestoneProgress(db);
-  assert.equal(progress.missing.length,0);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM milestone_characters').get()!.n,0);
+  await assert.rejects(generateTest(db,2,passages),/requirements/);
+  let resume!:()=>void;
+  const paused=new Promise<void>(resolve=>{resume=resolve;});
+  let started!:()=>void;
+  const second=new Promise<void>(resolve=>{started=resolve;});
+  let chapters=0;
+  const job=generateTest(db,1,async prompt=>{
+    if(prompt.startsWith('Write simplified Mandarin')&&++chapters===2){started();await paused;}
+    return passages(prompt);
+  });
+  await second;
+  assert.equal(preparation(db,1).completed,1);
+  assert.equal(preparation(db,1).total,9);
+  resume();
+  const id=await job;
+  assert.equal(preparation(db,1).attempt?.id,id);
   assert.equal(progress.passed,0);
 });
 
@@ -43,39 +66,75 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
     db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all());
   milestoneProgress(db);
   const before=evidence();
-  await assert.rejects(generateTest(db,1,async()=>'[]'),/incomplete/);
+  await assert.rejects(generateTest(db,1,async()=>'[]'),/exactly 1 chapters/);
   const [id,duplicate]=await Promise.all([generateTest(db,1,passages),generateTest(db,1,passages)]);
   assert.equal(id,duplicate);
   const intro=testView(db,id);
   assert.equal(intro.status,'ready');
-  assert.equal(intro.outline.length,15);
-  assert.equal(intro.outline.reduce((n,s)=>n+s.count,0),28);
+  assert.equal(intro.sections.length,15);
+  const wordPractice=intro.sections.filter(s=>s.kind==='Practice');
+  assert.equal(wordPractice.length,6);
+  for(const section of wordPractice)assert.equal(section.tasks.length,10);
+  assert.equal(intro.sections.reduce((n,s)=>n+s.tasks.length,0),78);
+
+  assert.equal(intro.sections[0].lines.length,3);
+  assert(intro.sections[0].lines[0].tokens?.every(t=>!('meaning' in t)));
+  assert.equal(intro.sections.find(s=>s.kind==='Dialogue')?.speakers?.length,14);
+  for(const section of intro.sections){
+    if(section.kind==='Book')assert(section.lines.some(line=>line.text.includes('包包')));
+    if(section.kind==='Dialogue')assert.equal(section.names?.length,2);
+    if(section.kind==='Article')assert.deepEqual(section.sections,['greeting','body','body','body','signature']);
+  }
+  assert.equal(db.prepare('SELECT count(*) AS n FROM stories').get()!.n,1);
 
   function run(id:string,fail:boolean){
     const sections=JSON.parse(String(db.prepare('SELECT sections FROM milestone_tests WHERE id=?').get(id)!.sections));
-    let view=startTest(db,id);
-    while('section' in view){
-      assert.deepEqual(view,testView(db,id));
-      const s=sections[view.section],e=s.exercises[view.task];
-      const answers=e?e.targets.map((item:{meaning:string})=>e.options.indexOf(item.meaning)):[s.questions[view.task].correct];
-      if(view.index<3)answers[0]=(answers[0]+1)%(e?.options.length??4);
-      if(fail&&e?.type==='match')[answers[0],answers[1]]=[answers[1],answers[0]];
-      const index=view.index;
-      view=submitTest(db,id,index,answers);
-      assert.deepEqual(submitTest(db,id,index,answers),view);
-      if(view.status==='active')assert(!('review' in view));
+    const view=startTest(db,id);
+    assert.equal(view.position,-1);
+    saveDraft(db,id,0,0,[0]);
+    saveDraft(db,id,-1);
+    assert.equal(testView(db,id).position,-1);
+    assert.deepEqual(testView(db,id).answers[0].answers,[0]);
+    for(let section=sections.length-1;section>=0;section--){
+      const s=sections[section];
+      view.sections[section].tasks.forEach((q,task)=>{
+        const e=s.exercises[task];
+        const answers=e?e.targets.map((item:{meaning:string})=>e.options.indexOf(item.meaning)):[s.questions[task].correct];
+        if(section===0||section===2&&task===0)answers[0]=(answers[0]+1)%s.questions[task].choices.length;
+        if(fail&&e?.type==='match')[answers[0],answers[1]]=[answers[1],answers[0]];
+        saveDraft(db,id,section,task,answers);
+      });
     }
-    return view;
+    assert.equal(testView(db,id).position,0);
+    assert(!('mistakes' in testView(db,id)));
+    const result=submitTest(db,id);
+    assert.deepEqual(submitTest(db,id),result);
+    return result;
   }
   const failed=run(id,true);
   assert.equal(failed.status,'failed');
-  assert.equal(failed.mistakes,5);
+  assert(failed.mistakes>3);
   const retry=await generateTest(db,1,passages);
   assert.notEqual(id,retry);
   const passed=run(retry,false);
   assert.equal(passed.status,'passed');
   assert.equal(passed.mistakes,3);
   assert.equal(milestoneProgress(db).milestone,2);
+  discardTest(db,retry);
+  assert.equal(milestoneProgress(db).passed,1);
+  prepareMilestones(db,passages);
+  const [retake,nextLevel]=await Promise.all([generateTest(db,1,passages),generateTest(db,2,passages)]);
+  assert.notEqual(retake,nextLevel);
+  assert.equal(preparation(db,2).attempt?.id,nextLevel);
+  assert.equal(startTest(db,retake).practiceRetake,true);
+  saveDraft(db,retake,0,0,[1]);
+  saveDraft(db,retake,0,0,[0]);
+  assert.deepEqual(testView(db,retake).answers[0].answers,[0]);
+  const blank=submitTest(db,retake);
+  assert.equal(blank.status,'failed');
+  assert.equal(blank.mistakes,0);
+  assert(blank.unanswered>0);
+  assert.equal(milestoneProgress(db).passed,1);
   assert.deepEqual(evidence(),before);
 });
 
@@ -105,6 +164,6 @@ test('dashboard and Progression share a capped score and attempt while formats f
   await fetch(base+path+'/start',{method:'POST'});
   const active=await get(path);
   assert.equal(active.status,'active');
-  assert.equal(active.question.correct,undefined);
-  assert.equal(active.question.explanation,undefined);
+  assert.equal(active.sections[0].tasks[0].correct,undefined);
+  assert.equal(active.sections[0].tasks[0].explanation,undefined);
 });
