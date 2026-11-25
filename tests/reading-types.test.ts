@@ -31,9 +31,9 @@ test('letters require one greeting, the selected number of body paragraphs, and 
 test('the preview pins the participant count and supports an open subject',t=>{
   const store=new ReadingStore();
   t.after(()=>store.db.close());
-  const first=practicePreview(store,{difficulty:'easy',minutes:10,type:'dialogue'});
-  const next=practicePreview(store,{difficulty:'medium',minutes:20,type:'dialogue',previewId:first.id});
-  const plan=confirmedPlan(store,next.id,'medium',20,'open');
+  const first=practicePreview(store,{difficulty:'easy',chapterCount:1,type:'dialogue'});
+  const next=practicePreview(store,{difficulty:'medium',chapterCount:2,type:'dialogue',previewId:first.id});
+  const plan=confirmedPlan(store,next.id,'medium',2,'open');
   assert.deepEqual(plan.format,{type:'dialogue',people:first.options.people});
   assert.equal(plan.subject,undefined);
 });
@@ -43,10 +43,10 @@ test('chat, recipe and baby book content survives generation, questions and stor
   t.after(()=>store.db.close());
   const formats:ReadingFormat[]=[{type:'dialogue',people:5},{type:'article',documents:['Recipe']},{type:'book',stage:'Baby book'}];
   for(const format of formats){
-    const plan:StoryPlan={format,difficulty:'easy',minutes:10,chapterCount:1,targetWords:40,ceiling:0,
+    const plan:StoryPlan={format,difficulty:'easy',chapterCount:1,targetWords:40,ceiling:0,
       background:['水','茶','家','什么'],newCharacters:[],newWords:[],reviewWords:[]};
     const count=format.type==='dialogue'?6:4;
-    const chapter={title:'Tea',paragraphs:Array.from({length:count},()=>[['茶:1','。']]),translations:Array(count).fill('Tea.'),
+    const chapter={title:'Tea',paragraphs:Array.from({length:count},()=>[['茶:1','什么:1','水:1','。']]),translations:Array(count).fill('Tea.'),
       ...(format.type==='dialogue'?{names:['我','妈妈','爸爸','姐姐','弟弟'],speakers:[0,1,2,3,4,1]}:{}),
       ...(format.type==='article'?{sections:['ingredients','ingredients','step','step']}:{})};
     const text=(word:string,en:string)=>({zh:[word],en});
@@ -68,7 +68,7 @@ test('chat, recipe and baby book content survives generation, questions and stor
     assert.deepEqual(saved.format,format);
     assert.deepEqual(saved.chapters[0].speakers,chapter.speakers);
     assert.deepEqual(saved.chapters[0].sections,chapter.sections);
-    assert.equal(saved.chapters[0].questions?.length,1);
+    assert.equal(saved.chapters[0].questions?.length,3);
     assert.equal(saved.cover?.reference,false);
     assert.match(saved.cover!.prompt,format.type==='article'?/photograph/:format.type==='dialogue'?/colored-pencil/:/gouache/);
   }

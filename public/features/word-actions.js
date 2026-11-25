@@ -82,6 +82,33 @@ export function setup(ui) {
       if(pending){const word=pending.word;clearPending();action(word,'lookup');}
       await Promise.all(saving);
     };
+    const unseen=new Set(cover?[]:story.chapters[chapter].unseenItems);
+    const struggling=new Set(cover?[]:story.chapters[chapter].strugglingCharacters);
+    const labels=new WeakMap();
+    const announced=new Set();
+    const observer=(unseen.size||struggling.size)&&'IntersectionObserver' in window?new IntersectionObserver(entries=>{
+      const visible=entries.filter(entry=>entry.isIntersecting);
+      const spacing=Math.min(110,1500/visible.length);
+      let order=0;
+      for(const entry of visible){
+        const span=entry.target;
+        observer.unobserve(span);
+        let delay=Math.round(order++*spacing);
+        for(const [label,items] of labels.get(span)){
+          if(items.every(text=>announced.has(text)))continue;
+          items.forEach(text=>announced.add(text));
+          const badge=el('span',label,'reader-status-label');
+          badge.lang='en';
+          badge.setAttribute('aria-hidden','true');
+          if(label==='Struggling')badge.classList.add('struggling-label');
+          badge.style.setProperty('--new-delay',delay+'ms');
+          badge.addEventListener('animationend',()=>badge.remove(),{once:true});
+          span.append(badge);
+          delay+=1350;
+        }
+      }
+    }):null;
+    if(observer)context.signal.addEventListener('abort',()=>observer.disconnect(),{once:true});
     for(const span of article.querySelectorAll('[data-word]')) {
       const index=Number(span.dataset.token);
       const token=cover?story.cover.tokens[index]:story.chapters[chapter].paragraphs[Number(span.dataset.paragraph)][index];
@@ -89,9 +116,26 @@ export function setup(ui) {
       span.onpointerenter=e=>{if(e.pointerType==='mouse')action(span,'preview');};
       span.onfocus=()=>action(span,'preview');
       span.tabIndex=0;span.setAttribute('role','button');span.setAttribute('aria-label','Look up '+token.text);
-      if(pinyin && token.pinyin) {
-        span.replaceChildren(readingWord(token,pinyin));
+      const newWord=!token.cast&&unseen.has(token.text);
+      const characters=token.cast?[]:[...new Set(token.text)];
+      const newCharacters=characters.filter(char=>unseen.has(char));
+      const redCharacters=characters.filter(char=>struggling.has(char));
+      const characterClasses=new Map();
+      if(!newWord)for(const char of newCharacters)characterClasses.set(char,'unseen-character');
+      for(const char of redCharacters)characterClasses.set(char,'struggling-character');
+      const groups=[];
+      if(redCharacters.length)groups.push(['Struggling',redCharacters]);
+      if(newWord||newCharacters.length){
+        groups.push(['New',[...new Set([...(newWord?[token.text]:[]),...newCharacters])]]);
+        span.classList.toggle('unseen-word',newWord);
       }
+      if(groups.length){
+        span.classList.add('has-reading-status');
+        labels.set(span,groups);
+        span.setAttribute('aria-label',['Look up '+token.text,...groups.map(([label,items])=>label+': '+items.join(', '))].join(' · '));
+        observer?.observe(span);
+      }
+      if(pinyin||characterClasses.size)span.replaceChildren(readingWord(token,pinyin,characterClasses));
       span.onclick=()=>tap(span);
       span.onkeydown=e=>{
         if(e.key==='Enter'||e.key===' '){e.preventDefault();action(span,'lookup');}

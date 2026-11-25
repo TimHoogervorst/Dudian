@@ -38,15 +38,15 @@ test('the story award survives a restart and scales only gains, once, across cha
   assert.equal(strengthFor(store.db,'character','水').score,null);
   answer(1,1,1);
   const score=(word:string)=>strengthFor(store.db,'word',word).score;
-  assert.equal(score('茶'),13.5);  // 2 × 2.5 × 0.7, on top of Library practice
-  assert.equal(score('天气'),-0.125); // 1.25 × 0.7 − 1
-  assert.equal(score('水'),0.35);   // 0.5 × 0.7, no penalty or appearance credit on miss
-  assert.equal(score('花'),0.35);   // two incidental appearances
+  assert.equal(score('茶'),12);  // 2 × 2.5 × 0.4, on top of Library practice
+  assert.equal(score('天气'),-0.5); // 1.25 × 0.4 − 1
+  assert.equal(score('水'),0.2);   // 0.5 × 0.4, no penalty or appearance credit on miss
+  assert.equal(score('花'),0.2);   // two incidental appearances
   const summary=storySummary(store,id);
-  assert.equal(summary.award!.multiplier,0.7);
+  assert.equal(summary.award!.multiplier,0.4);
   assert.equal(summary.award!.incorrect,2);
   assert.equal(summary.award!.penalties,1);
-  assert.equal(summary.award!.awarded,4.775);
+  assert.equal(summary.award!.awarded,2.3);
   const changes=store.db.prepare('SELECT count(*) AS n FROM score_changes').get()!.n;
   answer(1,1,0);finishChapter(store,id,1);
   assert.deepEqual(storySummary(store,id),summary);
@@ -55,12 +55,15 @@ test('the story award survives a restart and scales only gains, once, across cha
 
 test('first answers set every multiplier and ungraded stories earn no perfect-run bonus',t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
-  for(const [total,wrong,factor] of [[0,0,1],[1,0,1.2],[2,1,1],[3,2,0.7],[3,3,0.4],[4,4,0.4],[5,5,0.2]]){
+  for(const [total,wrong,factor] of [[0,0,1],[1,0,1.2],[10,1,1],[9,1,0.7],[4,1,0.7],
+    [3,1,0.4],[2,1,0.4],[3,2,0.2],[10,7,0.2],[7,5,-0.5],[1,1,-0.5]]){
     const id='story-'+total+'-'+wrong;
     store.saveStory({id,title:id,chapters:[{title:id,paragraphs:[[{text:'人'}]],questions:Array.from({length:total},()=>question('水'))}]});
     for(let i=0;i<total;i++)updateCheck(store,id,0,{action:'answer',question:i,choice:Number(i<wrong)});
     finishChapter(store,id,0);
-    assert.equal(storySummary(store,id).award!.multiplier,factor);
+    const {award}=storySummary(store,id);
+    assert.equal(award!.multiplier,factor);
+    if(factor<0)assert.ok(Number(award!.awarded)<0);
   }
 });
 

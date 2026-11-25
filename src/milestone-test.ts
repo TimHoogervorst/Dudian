@@ -44,7 +44,7 @@ async function generateSections(level:number,generate:typeof generateText,report
     const format:ReadingFormat=kind==='Book'?{type:'book',stage}:kind==='Dialogue'?{type:'dialogue',people}:
       {type:'article',documents:articleDocuments(formatLevel,1)};
     const focus=targets.slice(i*2,i*2+2);
-    const plan={...readingSize('hard',10),format,hskLimit:level,background:[...new Set([...background,...focus])],newWords:focus,
+    const plan={...readingSize('hard',1),format,hskLimit:level,background:[...new Set([...background,...focus])],newWords:focus,
       strongCharacters,newCharacters:[],reviewWords:[],ceiling:0};
     const story=await generateReading(plan,generate,[],undefined,focus);
     const chapter=story.chapters[0];

@@ -60,7 +60,7 @@ test('automatic practice reserves space for an overdue Strong item and skips Per
   const level=hskReadingProgress(db);
   adjustStrength(db,'word','东西',24);seeItem(db,'东西',at-1);
   assert.equal(hskReadingProgress(db),level);
-  const plan=buildPlan(store,'medium',10);
+  const plan=buildPlan(store,'medium',1);
   assert.equal(plan.reviewWords[0],'朋友');
   assert.ok(!plan.reviewWords.includes('东西'));
   const review=planWordReviews(store,plan)[0].words;

@@ -32,7 +32,9 @@ function drawSummary(root,session){
   const metrics=session.exercise===null?[[session.total,'Exercises'],[session.results.length,'Items reviewed'],[session.results.filter(i=>i.grade==='correct').length,'Correct']]:[[session.total,'Cards reviewed'],[session.results.filter(item=>item.grade==='correct').length,'Got it'],
     [session.results.filter(item=>item.grade==='almost').length,'Almost'],[session.results.filter(item=>item.grade==='incorrect').length,'Incorrect']];
   const titles={mixed:'Words and characters',word:'Word practice',character:'Character practice'};
-  page.append(summaryHeading('Practice complete',titles[session.kind],metrics));
+  const hasTotal=session.results.every(item=>item.points!==null);
+  const points=session.results.reduce((sum,item)=>sum+(item.points??0),0);
+  page.append(summaryHeading('Practice complete',titles[session.kind],metrics,null,{celebrate:hasTotal,points}));
   for(const [name,items] of groups){
     if(!items.length)continue;
     const section=el('section',null,'summary-panel');

@@ -4,11 +4,9 @@ import {lengthBudget,storyDifficulty} from './story-difficulty.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
 export type Difficulty = typeof difficulties[number];
-export const chapterCounts = {10:1,20:2,30:5} as const;
-export type StoryLength = keyof typeof chapterCounts;
 export const paragraphCounts = {easy:[1,1],medium:[2,2],hard:[3,4]} as const;
-export function validLength(value:unknown): value is StoryLength {
-  return typeof value==='number' && Object.hasOwn(chapterCounts,value);
+export function validLength(value:unknown): value is number {
+  return typeof value==='number' && Number.isInteger(value) && value>=1 && value<=6;
 }
 export interface Preferences {difficulty:Difficulty; ceilings:Record<Difficulty,number>}
 export interface StoryPlan {
@@ -16,7 +14,6 @@ export interface StoryPlan {
   format?:import('./reading-types.ts').ReadingFormat;
   subject?:import('./practice-subjects.ts').Subject;
   difficulty: Difficulty;
-  minutes: StoryLength;
   chapterCount: number;
   targetWords: number;
   ceiling: number;
@@ -60,16 +57,14 @@ export function setPreferences(store: ReadingStore, input: Preferences) {
   return preferences;
 }
 
-export function readingSize(difficulty:Difficulty,minutes:StoryLength){
-  const chapterCount=chapterCounts[minutes];
+export function readingSize(difficulty:Difficulty,chapterCount:number){
   const [min,max]=paragraphCounts[difficulty];
-  return {difficulty,minutes,chapterCount,targetWords:chapterCount*(min+max)/2*40};
+  return {difficulty,chapterCount,targetWords:chapterCount*(min+max)/2*40};
 }
 
-export function buildPlan(store: ReadingStore,difficulty: Difficulty,minutes: StoryLength,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
-  if (!difficulties.includes(difficulty) || !validLength(minutes)) throw new HttpError(400,'Choose a story length and difficulty.');
-  const chapterCount=chapterCounts[minutes];
+export function buildPlan(store: ReadingStore,difficulty: Difficulty,chapterCount: number,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
+  if (!difficulties.includes(difficulty) || !validLength(chapterCount)) throw new HttpError(400,'Choose a story length and difficulty.');
   const ceiling=lengthBudget(getPreferences(store).ceilings[difficulty],chapterCount);
   const focusLimit=lengthBudget(storyDifficulty[difficulty].focusCards,chapterCount);
-  return {...readingSize(difficulty,minutes),ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
+  return {...readingSize(difficulty,chapterCount),ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
 }

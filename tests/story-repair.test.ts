@@ -8,7 +8,7 @@ import {withChapterQuestions} from './quiz-fixture.ts';
 
 test('a word appearing elsewhere still needs to appear in its assigned chapter',async t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
-  const plan={...buildPlan(store,'easy',30),targetWords:20};
+  const plan={...buildPlan(store,'easy',5),targetWords:20};
   const groups=chapterFocus(plan);
   const chapters=groups.map((group,i)=>({title:'Chapter '+(i+1),paragraphs:[[[...group.map(w=>w+':1'),'。']]]}));
   const affected=2,word=groups[affected][0];
@@ -30,7 +30,7 @@ test('a word appearing elsewhere still needs to appear in its assigned chapter',
 
 test('a correction replaces chapter three and preserves the first two chapters', async () => {
   const store=new ReadingStore();
-  const plan={...buildPlan(store,'easy',30),newCharacters:[],newWords:[],chapterCount:3,targetWords:3};
+  const plan={...buildPlan(store,'easy',5),newCharacters:[],newWords:[],chapterCount:3,targetWords:5};
   const chapter=(title:string,word:string)=>({title,paragraphs:[[[word+':1','。']]]});
   const first=chapter('Tea','茶');
   const second=chapter('Water','水');
@@ -48,7 +48,7 @@ test('a correction replaces chapter three and preserves the first two chapters',
 
 test('later chapters get fresh retries and the model sees multiple invalid tokens together',async t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
-  const plan={...buildPlan(store,'easy',30),newCharacters:[],newWords:[],targetWords:5};
+  const plan={...buildPlan(store,'easy',5),newCharacters:[],newWords:[],targetWords:8};
   const chapter=(title:string,...tokens:string[])=>({title,paragraphs:[[tokens]]});
   const bad=chapter('Tea','直升机:1','茶:999');
   const good=chapter('Tea','茶:1');

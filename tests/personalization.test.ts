@@ -37,12 +37,12 @@ test('a late missing character takes a focus slot even in familiar words and sta
   db.prepare("INSERT INTO milestone_tests(id,level,status,sections) VALUES('first',1,'passed','[]')").run();
   setStrength(db,'word','朋友','red');
   seeItem(db,'朋友',Date.now()-10*day);
-  const plan=buildPlan(store,'hard',10,Date.now()+8*day);
+  const plan=buildPlan(store,'hard',1,Date.now()+8*day);
   assert(plan.reviewWords.includes('朋友'));
   assert(plan.newCharacters.includes(last));
   assert(plan.newWords.some(word=>word.includes(last)));
   assert.deepEqual(unseenCharacters(db,2),[last]);
-  assert(!buildPlan(store,'hard',10,Date.now(),new Set([last])).newCharacters.includes(last));
+  assert(!buildPlan(store,'hard',1,Date.now(),new Set([last])).newCharacters.includes(last));
 });
 test('a learner with only strong words reviews the least recently practiced eligible word',t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
@@ -52,10 +52,10 @@ test('a learner with only strong words reviews the least recently practiced elig
       gradeCard(store.db,session.id,0,'correct',date+i*1000);
     }
   }
-  assert.deepEqual(buildPlan(store,'medium',10,5*day).reviewWords,['茶']);
+  assert.deepEqual(buildPlan(store,'medium',1,5*day).reviewWords,['茶']);
   const line=store.story('tea-shop').chapters[0].paragraphs[0];
   recordAction(store,{storyId:'tea-shop',chapter:0,paragraph:0,token:line.findIndex(t=>t.text==='茶'),id:'tea',kind:'difficulty'},5*day);
-  assert.deepEqual(buildPlan(store,'medium',10,5*day+1).reviewWords,['水']);
+  assert.deepEqual(buildPlan(store,'medium',1,5*day+1).reviewWords,['水']);
 });
 test('marked words remain available as background, then become deliberate review targets exactly one day later', async t => {
   const store = new ReadingStore();
@@ -67,10 +67,10 @@ test('marked words remain available as background, then become deliberate review
   }
   finishChapter(store,'tea-shop',0,at);
   finishChapter(store,'tea-shop',1,at);
-  const soon = buildPlan(store,'medium',10,at+day-1);
+  const soon = buildPlan(store,'medium',1,at+day-1);
   assert(soon.background.includes('茶'));
   assert(![...soon.newWords,...soon.reviewWords].includes('茶'));
-  const due = buildPlan(store,'hard',10,at+day);
+  const due = buildPlan(store,'hard',1,at+day);
   assert.deepEqual([...due.reviewWords].sort(),['我','茶','朋友'].sort());
   assert.equal(due.newCharacters.length,3);
   const sentence=[...due.reviewWords,...due.newWords].map(word=>word+':1');
@@ -85,7 +85,7 @@ test('comfortable chapters can introduce the next level while HSK 1 is still lar
   t.after(()=>store.db.close());
   finishChapter(store,'tea-shop',0,day);
   finishChapter(store,'tea-shop',1,2*day);
-  const plan=buildPlan(store,'easy',10,3*day);
+  const plan=buildPlan(store,'easy',1,3*day);
   assert(plan.newCharacters.some(c=>catalog.get('character',c)?.level===2));
   assert(plan.newCharacters.length<=2);
   assert(plan.newCharacters.every(c=>plan.newWords.some(word=>word.includes(c))));
@@ -97,5 +97,5 @@ test('a missed flashcard is eligible without waiting and outranks lightly encoun
   finishChapter(store,'tea-shop',0,day);
   const deck=startSession(store.db,{kind:'word',words:['银行']});
   gradeCard(store.db,deck.id,0,'incorrect',2*day);
-  assert.equal(buildPlan(store,'medium',10,2*day).reviewWords[0],'银行');
+  assert.equal(buildPlan(store,'medium',1,2*day).reviewWords[0],'银行');
 });

@@ -19,14 +19,21 @@ export default async function generation({url,req,body,json,store}:Context) {
   } else if (url.pathname === '/api/story-preferences' && req.method==='POST') {
     json(200,setPreferences(store,await body()));
   } else if(url.pathname==='/api/practice-preview' && req.method==='POST'){
-    json(200,practicePreview(store,(await body())??{}));
+    const options=await body();
+    json(200,practicePreview(store,{...options,chapterCount:requestedChapters(options)}));
   } else if (url.pathname === '/api/generate-story' && req.method==='POST') {
     const options = await body();
-    const previewId=options?.previewId??(options?.type===undefined?undefined:practicePreview(store,options).id);
-    const plan=previewId===undefined?undefined:confirmedPlan(store,previewId,options.difficulty,options.minutes,options.subject);
-    json(202,startGeneration(store,options?.difficulty,options?.minutes,undefined,plan));
+    const chapterCount=requestedChapters(options);
+    const previewId=options?.previewId??(options?.type===undefined?undefined:practicePreview(store,{...options,chapterCount}).id);
+    const plan=previewId===undefined?undefined:confirmedPlan(store,previewId,options.difficulty,chapterCount,options.subject);
+    json(202,startGeneration(store,options?.difficulty,chapterCount,undefined,plan));
   } else if(url.pathname==='/api/generation-job' && req.method==='GET') {
     json(200,latestGeneration(store));
   } else return false;
   return true;
+}
+
+function requestedChapters(options:{chapterCount?:number;minutes?:number}|null){
+  if(options?.chapterCount!==undefined)return options.chapterCount;
+  return new Map([[10,1],[20,2],[30,5]]).get(options?.minutes??0)??0;
 }

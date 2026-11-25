@@ -1,3 +1,4 @@
+import {strengthFor} from './strength.ts';
 import {catalog} from './catalog.ts';
 import {dictionaryTokens} from './cover-text.ts';
 import {ReadingStore,HttpError,type Story} from './store.ts';
@@ -6,10 +7,13 @@ import {recordAnswer} from './story-scoring.ts';
 import {sentenceText} from './word-actions.ts';
 import {questionWords,readingItems,seeItem} from './encounters.ts';
 
+const libraryForms=new Set([...catalog.list('character'),...catalog.list('word')].map(item=>item.text));
+
 export function readerChapters(store:ReadingStore,story:Story){
   ensureCompletions(store.db);
   const answered=new Set(store.db.prepare('SELECT chapter,question FROM quiz_attempts WHERE story_id=? AND choice IS NOT NULL')
     .all(story.id).map(row=>row.chapter+'/'+row.question));
+  const colors=new Map<string,string>();
   return story.chapters.map(({questions,...chapter},index)=>{
     const readingDone=!!questions?.length && questions.every((q,i)=>q.reviewRound || answered.has(index+'/'+i));
     const rounds=[...new Set(questions?.flatMap(q=>q.reviewRound?[q.reviewRound]:[]))];
@@ -20,7 +24,16 @@ export function readerChapters(store:ReadingStore,story:Story){
       available=available && done;
       return item;
     });
-    return {...chapter,hasCheck:!!questions,readingDone,reviews};
+    const forms=readingItems(chapter.paragraphs.flat().filter(token=>!token.cast).map(token=>token.text));
+    const unseenItems:string[]=[],strugglingCharacters:string[]=[];
+    for(const text of forms){
+      if(!libraryForms.has(text))continue;
+      if(!colors.has(text))colors.set(text,strengthFor(store.db,'word',text).color);
+      const color=colors.get(text);
+      if(color==='gray')unseenItems.push(text);
+      else if(color==='red'&&Array.from(text).length===1)strugglingCharacters.push(text);
+    }
+    return {...chapter,unseenItems,strugglingCharacters,hasCheck:!!questions,readingDone,reviews};
   });
 }
 

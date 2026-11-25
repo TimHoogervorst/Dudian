@@ -7,7 +7,7 @@ import {withChapterQuestions} from './quiz-fixture.ts';
 
 test('an unplanned word or invalid sense never enters saved story history', async () => {
   const store = new ReadingStore();
-  const plan = {...buildPlan(store,'easy',10),targetWords:2};
+  const plan = {...buildPlan(store,'easy',1),targetWords:2};
   for(const invalid of ['直升机:1','茶:999','我喝茶。']) {
     const candidate = {title:'Tea',chapters:[{title:'Tea',paragraphs:[[[invalid,'。']]]}]};
     let requests=0;
@@ -22,19 +22,19 @@ test('the first generated story reopens with exact dictionary senses and budgete
   assert.equal(getPreferences(store).ceilings.easy,2);
   const settings = {difficulty:'medium',ceilings:{easy:1,medium:2,hard:4}};
   setPreferences(store,settings);
-  const plan = buildPlan(store,'easy',10);
+  const plan = buildPlan(store,'easy',1);
   assert.equal(plan.newCharacters.length,1);
   assert.equal(getPreferences(store).difficulty,'medium');
   const word = plan.newWords[0];
   const sentence = [word+':1','。'];
   const candidate = {title:'At home',chapters:[{title:'A visit',paragraphs:[[sentence]]}]};
-  const result = await generateStory(store,{...plan,targetWords:1},withChapterQuestions(async prompt => {
+  const result = await generateStory(store,{...plan,targetWords:3},withChapterQuestions(async prompt => {
     assert.ok(prompt.includes(word));
     return JSON.stringify(candidate);
   }));
   const reopened = store.story(result.id);
   assert.deepEqual(reopened.chapters[0].translations,['Baobao is here.']);
-  assert.equal(reopened.chapters[0].questions?.length,1);
+  assert.equal(reopened.chapters[0].questions?.length,3);
   assert.deepEqual(reopened.chapters[0].questions?.[0].prompt.words,['什么']);
   const token = reopened.chapters[0].paragraphs[0][0];
   assert.equal(token.text,word);
@@ -48,9 +48,9 @@ test('the first generated story reopens with exact dictionary senses and budgete
 test('story length sets chapters independently of the difficulty budget',t=>{
   const store=new ReadingStore();
   t.after(()=>store.db.close());
-  for(const [minutes,chapters] of [[10,1],[20,2],[30,5]] as const){
+  for(const chapters of [1,2,3,4,5,6]){
     for(const [difficulty,words] of [['easy',40],['medium',80],['hard',140]] as const){
-      const plan=buildPlan(store,difficulty,minutes);
+      const plan=buildPlan(store,difficulty,chapters);
       assert.equal(plan.chapterCount,chapters);
       assert.equal(plan.targetWords,chapters*words);
     }

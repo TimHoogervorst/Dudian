@@ -61,21 +61,29 @@ export function setup(ui) {
     const panel=el('aside',null,'practice-sidebar');
     const layout=el('div',null,'practice-layout');
     const form=el('form',null,'story-options');
-    const mode=choiceGroup('Mode','mode','reading',[
-      {value:'reading',symbol:'book'}, {value:'speaking',symbol:'microphone',disabled:true},
-      {value:'listening',symbol:'headphones',disabled:true},
-    ]);
     const storyType=choiceGroup('Type','storyType','book',[
       {value:'book',label:'Book',symbol:'book'},
       {value:'article',label:'Article',symbol:'newspaper'},
       {value:'dialogue',label:'Dialogue',symbol:'conversation'},
     ]);
     const difficulty=choiceGroup('Difficulty','difficulty',preferences.difficulty,levels.map(value=>({value,symbol:value})));
-    const duration=choiceGroup('Story length','minutes','10',[
-      {value:'10',label:'Short · 1 chapter',symbol:'short'},
-      {value:'20',label:'Medium · 2 chapters',symbol:'short'},
-      {value:'30',label:'Long · 5 chapters',symbol:'long'},
-    ]);
+    const duration=el('fieldset',null,'story-length');
+    const range=el('input');
+    range.type='range';range.name='chapterCount';range.id='story-chapters';
+    range.min='1';range.max='6';range.step='1';range.value='1';
+    const label=el('label','Story length');
+    label.htmlFor=range.id;
+    const lengthValue=el('output');
+    lengthValue.htmlFor.add(range.id);
+    function showLength(){
+      const n=range.valueAsNumber;
+      const size=n===1?'Short':n<=4?'Medium':'Long';
+      lengthValue.value=size+' · '+n+(n===1?' chapter':' chapters');
+      range.setAttribute('aria-valuetext',lengthValue.value);
+    }
+    range.oninput=showLength;
+    showLength();
+    duration.append(label,lengthValue,range);
     const button=el('button','Generate story','button');
     button.append(icon('arrow'));
     const status=el('p');status.setAttribute('role','status');
@@ -85,7 +93,7 @@ export function setup(ui) {
     const focus=el('fieldset',null,'practice-focus');
     const cards=el('div',null,'focus-cards');
     focus.append(el('legend','Character focus'),cards,el('p','Base estimates assume unaided reading. Your final story score determines the points awarded.','focus-note'));
-    form.append(el('h1','Create a story'),mode,storyType,difficulty,duration,subject,focus,button,status);
+    form.append(el('h1','Create a story'),storyType,difficulty,duration,subject,focus,button,status);
     layout.append(form);
     if(current){
       const card=el('article',null,'practice-story');
@@ -109,7 +117,7 @@ export function setup(ui) {
       status.textContent='Updating character focus…';
       try{
         const next=await api('/api/practice-preview',{
-          type:choices.get('storyType'),minutes:Number(choices.get('minutes')),difficulty:choices.get('difficulty'),previewId:preview?.id,reroll,
+          type:choices.get('storyType'),chapterCount:Number(choices.get('chapterCount')),difficulty:choices.get('difficulty'),previewId:preview?.id,reroll,
         },signal);
         if(signal.aborted||request!==revision)return;
         if(next.subjects.some((item,i)=>preview?.subjects[i]?.zh!==item.zh)){
@@ -161,7 +169,7 @@ export function setup(ui) {
       for(const group of form.querySelectorAll('fieldset'))group.disabled=true;
       status.textContent='Starting your story…';
       try{
-        await api('/api/generate-story',{previewId:preview.id,subject:choices.get('subject'),minutes:Number(choices.get('minutes')),difficulty:choices.get('difficulty')});
+        await api('/api/generate-story',{previewId:preview.id,subject:choices.get('subject'),chapterCount:Number(choices.get('chapterCount')),difficulty:choices.get('difficulty')});
         if(!signal.aborted)ui.navigate('home');
       }catch(error){
         status.textContent=error.message;

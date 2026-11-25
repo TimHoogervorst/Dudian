@@ -3,7 +3,15 @@ import {displayLevel} from '../reading-progress.js';
 import {icon} from '../icons.js';
 import {api,el,link} from '../ui.js';
 
-function hskScale(level,filterButton){
+function phaseStatus(score,progress){
+  if(score<=progress.passed)return 'Passed';
+  if(score===progress.milestone)return 'Milestone reached';
+  if(score===progress.passed+1)return 'Next phase';
+  return 'Locked';
+}
+
+function hskScale(progress,filterButton){
+  const {level}=progress;
   const scale=el('div',null,'roadmap-scale');
   scale.setAttribute('role','group');
   scale.setAttribute('aria-label','Select an HSK level to view its test and reading formats. Current score '+displayLevel(level));
@@ -14,6 +22,14 @@ function hskScale(level,filterButton){
     tick.className='roadmap-tick';
     tick.style.left=i/6*100+'%';
     if(level>=i)tick.classList.add('reached');
+    if(i>0){
+      const status=phaseStatus(i,progress);
+      tick.setAttribute('aria-label','HSK '+i+' · '+status);
+      if(status==='Locked'){
+        tick.classList.add('locked');
+        tick.append(icon('lock'));
+      }
+    }
     rail.append(tick);
   }
   rail.append(el('strong',displayLevel(level),'roadmap-marker'));
@@ -45,10 +61,15 @@ export function setup(ui){
     summary.append(test,nextUnlock(cards));
     const defaultLevel=progress.milestone??Math.min(6,progress.passed+1);
     function showTest(score){
-      const passed=score<=progress.passed;
+      const status=phaseStatus(score,progress);
+      const passed=status==='Passed';
       test.replaceChildren(el('h2','HSK '+score+' test'));
-      if(!passed&&score!==progress.milestone){
-        test.append(el('p','Locked · Reach HSK '+score+' to unlock this test.'));
+      if(status==='Locked'){
+        test.append(el('p','Locked · Pass the HSK '+(score-1)+' test to unlock this phase.'));
+        return;
+      }
+      if(status==='Next phase'){
+        test.append(el('p','Next phase · Reach HSK '+score+' to take this test.'));
         return;
       }
       test.append(el('p',passed?'Passed · Practice retakes are available.':'Milestone reached · Pass this test to continue.'),
@@ -94,7 +115,7 @@ export function setup(ui){
         '✓ Unlocked'+(card.current?' · Current stage':''):'Locked · Reach HSK '+card.threshold));
       return item;
     }
-    root.append(heading,hskScale(level,filterButton),summary,section);
+    root.append(heading,hskScale(progress,filterButton),summary,section);
     const requested=Number(parts[0]);
     select(Number.isInteger(requested)&&requested>=1&&requested<=6?requested:defaultLevel);
   });

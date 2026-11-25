@@ -91,9 +91,14 @@ export function addCheckmark(a){
   a.append(mark);
 }
 
-export function readingWord(word,pinyin){
-  if(!pinyin||!word.pinyin)return document.createTextNode(word.text);
-  const ruby=el('ruby',word.text);
+export function readingWord(word,pinyin,characterClasses){
+  const text=document.createDocumentFragment();
+  if(characterClasses?.size){
+    for(const char of word.text)text.append(characterClasses.has(char)?el('span',char,characterClasses.get(char)):char);
+  }else text.append(word.text);
+  if(!pinyin||!word.pinyin)return text;
+  const ruby=el('ruby');
+  ruby.append(text);
   ruby.append(el('rt',word.pinyin));
   return ruby;
 }

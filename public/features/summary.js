@@ -14,9 +14,12 @@ function storyTags(result,signal){
     const {base,multiplier,penalties,awarded,incorrect}=result.award;
     const points=new Intl.NumberFormat(undefined,{maximumFractionDigits:3});
     const flawless=multiplier===1.2;
-    const outcome=flawless?'Flawless':incorrect?incorrect+(incorrect===1?' mistake':' mistakes'):'Ungraded';
-    const reason=flawless?'Every answer correct. +20% to base points.':
-      incorrect?'Answer accuracy applies a '+multiplier+'× multiplier.':'No graded questions. Base points count at 1×.';
+    const total=(result.quiz?.total??0)+(result.wordReview?.total??0);
+    const correct=total-incorrect;
+    const accuracy=new Intl.NumberFormat(undefined,{style:'percent',maximumFractionDigits:1});
+    const outcome=total?accuracy.format(correct/total)+' correct':'Ungraded';
+    const reason=total?correct+' of '+total+' correct. Score multiplier '+multiplier+'×.':
+      'No graded questions. Base points count at 1×.';
     const calculation=points.format(base)+' × '+multiplier+(penalties?' − '+points.format(penalties)+' in penalties':'');
     const limited=Math.abs(base*multiplier-penalties-awarded)>0.0005;
     tags.push({label:outcome,flawless,detail:reason+' '+calculation+' → '+points.format(awarded)+' net points'+(limited?' after item score limits':'')+'.'});
@@ -57,7 +60,8 @@ export function setup(ui) {
     const metrics=[[result.chapters,result.chapters===1?'Chapter read':'Chapters read'],[result.distinctWords,'Distinct words']];
     if(result.quiz)metrics.push([result.quiz.correct+'/'+result.quiz.total,'Questions correct']);
     if(result.wordReview)metrics.push([result.wordReview.correct+'/'+result.wordReview.total,'Word cards correct']);
-    root.append(summaryHeading('Story complete',result.title,metrics,storyTags(result,signal)));
+    root.append(summaryHeading('Story complete',result.title,metrics,storyTags(result,signal),
+      {celebrate:!!result.award,points:result.award?.awarded}));
     const gains=el('section',null,'summary-panel');
     const gainHeading=el('div',null,'summary-section-heading');
     const total=result.characterGains.highlights.length+result.characterGains.otherCount;

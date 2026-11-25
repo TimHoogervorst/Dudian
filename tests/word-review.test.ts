@@ -6,21 +6,40 @@ import {reviewBoundaries,planWordReviews,wordReviewCards} from '../src/word-revi
 import {catalog} from '../src/catalog.ts';
 import {chapterCheck,updateCheck,readerChapters} from '../src/chapter-check.ts';
 import {storySummary} from '../src/story-summary.ts';
-import {strengthFor} from '../src/strength.ts';
+import {setStrength,strengthFor} from '../src/strength.ts';
+
+test('reader highlights follow Library status for words and their individual characters',t=>{
+  const store=new ReadingStore();t.after(()=>store.db.close());
+  const story={id:'unseen',title:'Unseen',chapters:[{title:'Reading',paragraphs:[[
+    {text:'今天'},{text:'今天'},{text:'。'},{text:'包包',cast:'baobao' as const}]]}]};
+  setStrength(store.db,'word','今天','green');
+  setStrength(store.db,'character','今','yellow');
+  assert.deepEqual(readerChapters(store,story)[0].unseenItems,['天']);
+  setStrength(store.db,'word','今天','gray');
+  setStrength(store.db,'character','今','red');
+  const chapter=readerChapters(store,story)[0];
+  assert.deepEqual(chapter.unseenItems,['今天','天']);
+  assert.deepEqual(chapter.strugglingCharacters,['今']);
+  setStrength(store.db,'character','今','green');
+  assert.deepEqual(readerChapters(store,story)[0].strugglingCharacters,[]);
+});
 
 test('two ten-word reviews resume in order and count first answers once',t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
-  const plan=buildPlan(store,'hard',10);
-  assert.deepEqual(reviewBoundaries(plan),[0,0]);
-  assert.deepEqual(reviewBoundaries({...plan,chapterCount:5}),[1,2]);
-  assert.deepEqual(reviewBoundaries({...plan,difficulty:'medium',chapterCount:5}),[2]);
-  assert.deepEqual(reviewBoundaries({...plan,difficulty:'easy'}),[]);
+  const plan=buildPlan(store,'hard',4);
+  const schedules=[[0],[1],[1],[1,3],[1,3],[1,3,5]];
+  for(const difficulty of ['easy','medium','hard'] as const){
+    for(const [index,expected] of schedules.entries()){
+      const selected={...plan,difficulty,chapterCount:index+1};
+      assert.deepEqual(reviewBoundaries(selected),expected);
+      assert.deepEqual(planWordReviews(store,selected).map(round=>round.words.length),
+        expected.map(()=>({easy:2,medium:5,hard:10}[difficulty])));
+    }
+  }
   const rounds=planWordReviews(store,plan);
   const words=rounds.flatMap(r=>r.words);
   assert.deepEqual(rounds.map(r=>r.words.length),[10,10]);
   assert.equal(new Set(words).size,20);
-  const medium=planWordReviews(store,{...plan,difficulty:'medium'});
-  assert.deepEqual(medium.map(r=>r.words.length),[5]);
   const limited=planWordReviews(store,{...plan,background:words.slice(0,14),newWords:[],reviewWords:[],compound:undefined});
   assert.ok(limited.every(r=>new Set(r.words).size===10));
   assert.equal(new Set(limited.flatMap(r=>r.words)).size,14);

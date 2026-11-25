@@ -49,7 +49,7 @@ export function setup(ui){
         const panel=el('section',null,'summary-panel test-result');
         const passed=state.status==='passed';
         panel.append(summaryHeading('HSK '+state.level+' milestone test',passed?'Passed':'Failed',
-          [[state.reading.mistakes,'Reading mistakes'],[state.practice.mistakes,'Word practice mistakes']],null,passed));
+          [[state.reading.mistakes,'Reading mistakes'],[state.practice.mistakes,'Word practice mistakes']],null,{celebrate:passed}));
         panel.append(el('p','Unanswered: '+state.reading.unanswered+' reading · '+state.practice.unanswered+' word practice.'));
         for(const r of state.review){
           const entry=el('section',null,'test-review');

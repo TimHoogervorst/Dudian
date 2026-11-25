@@ -67,9 +67,12 @@ export function recordAnswer(db:DatabaseSync,story:Story,chapter:number,index:nu
 export function storyMultiplier(total:number,incorrect:number){
   if(!total)return 1;
   if(!incorrect)return 1.2;
-  if(incorrect===1)return 1;
-  if(incorrect===2)return 0.7;
-  return incorrect<=4?0.4:0.2;
+  const correct=(total-incorrect)*100;
+  if(correct>=90*total)return 1;
+  if(correct>=75*total)return 0.7;
+  if(correct>=50*total)return 0.4;
+  if(correct>=30*total)return 0.2;
+  return -0.5;
 }
 const rounded=(n:number)=>Math.round(n*1000)/1000;
 

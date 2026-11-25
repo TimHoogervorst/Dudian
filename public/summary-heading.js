@@ -1,11 +1,46 @@
 import {el} from './ui.js';
 
-export function summaryHeading(label,title,metrics,tags,celebrate=true){
+function pointsCounter(total){
+  const counter=el('div',null,'summary-points');
+  const format=new Intl.NumberFormat(undefined,{signDisplay:'exceptZero',maximumFractionDigits:3});
+  counter.setAttribute('role','img');
+  counter.setAttribute('aria-label',format.format(total)+' net points');
+  const number=el('strong');
+  const caption=el('span','Net points');
+  counter.append(number,caption);
+  counter.style.setProperty('--offset',total<0?'-.18em':'.18em');
+  counter.style.setProperty('--score-color',total<0?'#ae343c':'#16723e');
+  function display(value){
+    number.textContent=format.format(value);
+    number.style.setProperty('--intensity',Math.min(Math.abs(value)/30,1)*100+'%');
+  }
+  if(!total||matchMedia('(prefers-reduced-motion: reduce)').matches){
+    display(total);
+  }else{
+    display(0);
+    const start=performance.now();
+    function tick(now){
+      if(!counter.isConnected)return;
+      const progress=Math.min(1,Math.max(0,(now-start)/950));
+      const value=total*(1-(1-progress)**2);
+      display(progress===1?total:Math.trunc(value*10)/10);
+      if(progress<1)requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+  }
+  return counter;
+}
+
+export function summaryHeading(label,title,metrics,tags,{celebrate=true,points}={}){
   const heading=el('header',null,'summary-heading');
   const celebration=el('div',null,'summary-celebration');
-  const mascot=el('img');mascot.src='/baobao.png';mascot.alt='Bāobāo smiling and waving';
-  celebration.append(mascot);
-  for(const side of [-1,1]){
+  if(celebrate){
+    if(points===undefined){
+      const mascot=el('img');mascot.src='/baobao.png';mascot.alt='Bāobāo smiling and waving';
+      celebration.append(mascot);
+    }else celebration.append(pointsCounter(points));
+  }
+  for(const side of celebrate&&(points===undefined||points>0)?[-1,1]:[]){
     for(let i=0;i<7;i++){
       const piece=el('i',null,'summary-confetti');piece.setAttribute('aria-hidden','true');
       piece.style.setProperty('--x',side*(23+i*4)+'%');

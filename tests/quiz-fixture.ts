@@ -5,6 +5,15 @@ export function withChapterQuestions(write:CandidateWriter,count=1):CandidateWri
     if(!prompt.startsWith('Write a chapter comprehension check.')){
       const draft=JSON.parse(await write(prompt));
       for(const chapter of draft.chapters??[draft])chapter.translations??=chapter.paragraphs.map(()=>'Baobao is here.');
+      for(const match of prompt.matchAll(/segmented word by the end of chapter (\d+): (.+)\./g)){
+        const index=Number(match[1])-1;
+        const chapter=draft.chapters?.[index]??(prompt.includes('Revise only chapter '+(index+1)+'.')?draft:undefined);
+        if(!chapter)continue;
+        const sentence=chapter.paragraphs[0][0];
+        for(const word of match[2].split(', ')){
+          if(!chapter.paragraphs.flat(2).includes(word+':1'))sentence.push(word+':1');
+        }
+      }
       if(draft.chapters){
         draft.chapters[0].paragraphs[0][0].push('包包:1');
         draft.teaser=['包包:1','来:1','了:1','。'];

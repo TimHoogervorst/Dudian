@@ -2,7 +2,7 @@ import {articleDocuments,readingOptions,type ReadingType} from './reading-types.
 import {randomUUID} from 'node:crypto';
 import {encounterFor,perfectScore} from './encounters.ts';
 import {catalog,entryKind} from './catalog.ts';
-import {buildPlan,chapterFocus,difficulties,validLength,type Difficulty,type StoryLength,type StoryPlan} from './story-plan.ts';
+import {buildPlan,chapterFocus,difficulties,validLength,type Difficulty,type StoryPlan} from './story-plan.ts';
 import {lengthBudget,storyDifficulty} from './story-difficulty.ts';
 import {strengthFor,hskReadingProgress} from './strength.ts';
 import {milestoneProgress} from './milestone-progress.ts';
@@ -20,9 +20,9 @@ function draftFor(store:ReadingStore,id:string){
   return draft;
 }
 
-export function confirmedPlan(store:ReadingStore,id:string,difficulty:Difficulty,minutes:StoryLength,subjectId?:string){
+export function confirmedPlan(store:ReadingStore,id:string,difficulty:Difficulty,chapterCount:number,subjectId?:string){
   const {plan,subjects}=draftFor(store,id);
-  if(plan.difficulty!==difficulty || plan.minutes!==minutes)throw new HttpError(409,'The selection changed. Refresh the practice preview.');
+  if(plan.difficulty!==difficulty || plan.chapterCount!==chapterCount)throw new HttpError(409,'The selection changed. Refresh the practice preview.');
   if(subjectId==='open')return {...plan,subject:undefined};
   const subject=subjectId===undefined?subjects[0]:subjects.find(item=>item.zh===subjectId);
   if(!subject)throw new HttpError(400,'Choose a subject from this preview.');
@@ -42,14 +42,14 @@ function backgroundTarget(store:ReadingStore,plan:StoryPlan,excluded:Set<string>
   if(word)return {word,role:'review',characters:[]};
 }
 
-export function practicePreview(store:ReadingStore,options:{difficulty:Difficulty;minutes:StoryLength;previewId?:string;reroll?:string;type?:ReadingType}){
-  const {difficulty,minutes,previewId,reroll}=options;
-  if(!difficulties.includes(difficulty)||!validLength(minutes))throw new HttpError(400,'Choose a story length and difficulty.');
+export function practicePreview(store:ReadingStore,options:{difficulty:Difficulty;chapterCount:number;previewId?:string;reroll?:string;type?:ReadingType}){
+  const {difficulty,chapterCount,previewId,reroll}=options;
+  if(!difficulties.includes(difficulty)||!validLength(chapterCount))throw new HttpError(400,'Choose a story length and difficulty.');
   const previous=previewId?draftFor(store,previewId):undefined;
   let plan:StoryPlan;
   let focus:Focus[];
   const excluded=new Set(previous?.plan.difficulty===difficulty?previous.excluded:[]);
-  if(previous && previous.plan.difficulty===difficulty && previous.plan.minutes===minutes){
+  if(previous && previous.plan.difficulty===difficulty && previous.plan.chapterCount===chapterCount){
     plan={...previous.plan};
     focus=[...previous.focus];
     if(reroll!==undefined){
@@ -57,7 +57,7 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
       if(i<0)throw new HttpError(400,'Select a focus card to reroll.');
       const old=focus[i];
       const reserved=new Set([...excluded,...focus.flatMap(item=>[item.word,...item.characters])]);
-      const alternate=targets(buildPlan(store,difficulty,minutes,Date.now(),reserved))
+      const alternate=targets(buildPlan(store,difficulty,chapterCount,Date.now(),reserved))
         .filter(item=>!reserved.has(item.word) && item.characters.every(c=>!reserved.has(c)));
       const next=alternate.find(item=>item.role===old.role && (item.role!=='new'||item.characters.length<=old.characters.length))
         ??alternate.find(item=>item.role==='review')??backgroundTarget(store,plan,reserved);
@@ -67,7 +67,7 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
       for(const c of old.characters)excluded.add(c);
     }
   }else{
-    plan=buildPlan(store,difficulty,minutes,Date.now(),excluded);
+    plan=buildPlan(store,difficulty,chapterCount,Date.now(),excluded);
     focus=targets(plan).slice(0,lengthBudget(storyDifficulty[difficulty].focusCards,plan.chapterCount));
     if(previous?.plan.difficulty===difficulty){
       const priorOrder=new Map(previous.focus.map((item,i)=>[item.word,i]));

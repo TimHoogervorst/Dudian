@@ -62,3 +62,8 @@
 .subject-card strong{font-size:1.25rem}.subject-card span{font: .85rem/1.25 var(--sans)}
 @media(max-width:640px){.subject-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,6rem),1fr))}}
 .focus-state[data-color=gold]::before{background:#bd860f}
+
+.story-length{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:.5rem}
+.story-length label{font:600 1.05rem var(--sans)}
+.story-length output{font:.95rem var(--sans);color:var(--muted)}
+.story-length input{grid-column:1/-1;width:100%;margin:0;accent-color:var(--red);cursor:pointer}

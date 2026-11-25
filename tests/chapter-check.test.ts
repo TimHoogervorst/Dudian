@@ -31,7 +31,7 @@ test('approved quiz words with attached punctuation survive generation',async t=
   const chapter={title:'The Little Cup',paragraphs:[[{text:'茶',entry:'茶',sense:1}]]};
   const choices=['茶','水','家'].map((w,i)=>({zh:[w],en:['Tea','Water','Home'][i]}));
   const q={prompt:{zh:['什么？'],en:'What?'},choices,correct:0,paragraph:0,token:0,word:'茶',characters:[]};
-  const questions=await generateQuestions(chapter,buildPlan(store,'medium',20),['什么','茶','水','家'],
+  const questions=await generateQuestions(chapter,buildPlan(store,'medium',2),['什么','茶','水','家'],
     async()=>JSON.stringify({questions:[q,{...q,prompt:{zh:['茶','？'],en:'Tea?'}}]}));
   assert.equal(questions.length,2);
   assert.deepEqual(questions[0].prompt.words,['什么','？']);
@@ -55,8 +55,8 @@ test('chapter answers persist once, translations affect credit, and final comple
   assert.equal(answer(1,1).completion.finished,false);
   assert.equal(answer(2,0).completion.finished,true);
   assert.equal(answer(2,2).questions[2].choice,0);
-  assert.equal(strengthFor(store.db,'word','椅子').score,0.5);
-  assert.equal(strengthFor(store.db,'character','椅').score,0.5);
+  assert.equal(strengthFor(store.db,'word','椅子').score,0.2);
+  assert.equal(strengthFor(store.db,'character','椅').score,0.2);
   assert.equal(strengthFor(store.db,'word','茶').score,null);
   assert.equal(strengthFor(store.db,'word','水').score,null);
   assert.equal(strengthFor(store.db,'character','水').score,null);
@@ -66,7 +66,7 @@ test('chapter answers persist once, translations affect credit, and final comple
 test('invalid question vocabulary is rejected before a chapter check can be saved',async()=>{
   const store=new ReadingStore();
   const chapter=store.story('tea-shop').chapters[0];
-  const plan=buildPlan(store,'easy',10);
+  const plan=buildPlan(store,'easy',1);
   const prompt={zh:['直升机'],en:'Helicopter'};
   const choices=['茶','水','家'].map((w,i)=>({zh:[w],en:['Tea','Water','Home'][i]}));
   const q={prompt,choices,correct:0,paragraph:0,token:0,word:'茶',characters:[]};

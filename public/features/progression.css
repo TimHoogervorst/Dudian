@@ -5,6 +5,8 @@
 .roadmap-tick,.roadmap-marker{position:absolute;transform:translateX(-50%);white-space:nowrap}
 .roadmap-tick{top:0;padding:1rem .15rem .35rem;border:0;border-radius:.25rem;background:transparent;color:var(--muted);font:600 clamp(.69rem,1.4vw,.95rem) var(--sans)}
 .roadmap-tick::before{content:"";position:absolute;left:50%;top:2px;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:50%;border:2px solid #a58e77;background:var(--paper)}
+.roadmap-tick.locked::before{display:none}
+.roadmap-tick.locked .ui-icon{position:absolute;left:50%;top:2px;transform:translate(-50%,-50%);width:1rem;height:1rem;background:var(--paper);stroke-width:2}
 .roadmap-tick.reached::before{background:var(--red);border-color:var(--red)}
 .roadmap-tick[aria-pressed=true]{color:var(--red);text-decoration:underline;text-underline-offset:.28em}
 .roadmap-tick[aria-pressed=true]::before{outline:2px solid var(--red);outline-offset:2px}

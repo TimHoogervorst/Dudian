@@ -1,4 +1,12 @@
 .chapter-text [data-word]{cursor:pointer;border-radius:.12em}
+.chapter-text .unseen-word,.chapter-text .unseen-character{background:#dcecd4;border-radius:.12em}
+.chapter-text .struggling-character{background:#f5d9d6;border-radius:.12em}
+.chapter-text .has-reading-status{position:relative}
+.chapter-text .reader-status-label{position:absolute;z-index:1;left:50%;bottom:100%;padding:.12rem .32rem;border-radius:.3rem;background:#e4f3dc;color:#285833;font:600 .68rem/1.2 var(--sans);letter-spacing:0;pointer-events:none;opacity:0;animation:reader-new 1.35s ease-out var(--new-delay) both}
+.chapter-text .struggling-label{color:#852c32;background:#fae2de}
+@keyframes reader-new{0%{opacity:0;transform:translate(-50%,0)}20%,65%{opacity:1}100%{opacity:0;transform:translate(-50%,-.8rem)}}
+@media(prefers-reduced-motion:reduce){.chapter-text .reader-status-label{left:0;animation-name:reader-new-still}@keyframes reader-new-still{0%,100%{opacity:0}15%,80%{opacity:1}}}
+.chapter-text [data-word]:hover :is(.unseen-character,.struggling-character),.chapter-text .selected-word :is(.unseen-character,.struggling-character){background:transparent}
 .chapter-text [data-word]:hover{background:#eddfc7}
 .chapter-text .selected-word{background:#eed087}
 :is(.chapter-text,.check-chinese) ruby rt{font:500 .35em/1.2 var(--sans);letter-spacing:0;color:var(--muted)}
