@@ -1,0 +1,13 @@
+﻿<!doctype html><meta charset=utf-8><title>Practice story generation</title><style>body{font:18px/1.6 system-ui;max-width:850px;margin:4rem auto;color:#213929}h1,h2{line-height:1.2}code{font-size:0.9em}</style><script src="https://cdn.tailwindcss.com"></script><script type=module>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true});</script><h1>How Practice generates a story</h1><pre class=mermaid>
+flowchart TD
+A[Confirmed preview] --> B[Select vocabulary and review targets]
+B --> C[Write title, teaser and every chapter]
+C --> D[Validate whole draft]
+D -->|Chapter error| E[Send full draft and request replacement chapter]
+E --> D
+D -->|Story error| F[Request complete story again]
+F --> D
+D -->|Retries exhausted| G[Record failure]
+D -->|Accepted| H[Generate chapter questions]
+H --> I[Save to Library]
+</pre><h2>Follow one request</h2><p><code>practice-preview.ts · story-plan.ts · vocabulary-plan.ts</code> assemble the confirmed plan. <code>generation-job.ts</code> starts the job. <code>word-review.ts</code> adds required review words. <code>reading-format.ts · story-generation.ts</code> build the prompt and validate the result. <code>provider.ts</code> sends each request independently. <code>quiz-generation.ts</code> builds checks against the accepted text. <code>store.ts</code> saves the completed reading.</p><h2>Where work repeats</h2><p>A single unlisted token triggers a replacement chapter. That replacement can invalidate coverage established in earlier drafts. The job stores the latest status and error while draft text lives in the running generation call.</p>

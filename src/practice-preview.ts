@@ -9,6 +9,7 @@ import {milestoneProgress} from './milestone-progress.ts';
 import {HttpError,type ReadingStore} from './store.ts';
 
 import {suggestSubjects,type Subject} from './practice-subjects.ts';
+import {personalizeCharacters} from './practice-characters.ts';
 
 type Focus={word:string;role:'new'|'review'|'compound';characters:string[]};
 type Draft={options:ReturnType<typeof readingOptions>;plan:StoryPlan;focus:Focus[];excluded:string[];subjects:Subject[]};
@@ -49,6 +50,7 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
   let plan:StoryPlan;
   let focus:Focus[];
   const excluded=new Set(previous?.plan.difficulty===difficulty?previous.excluded:[]);
+  const makePlan=(skip:Set<string>)=>personalizeCharacters(store,buildPlan(store,difficulty,chapterCount,Date.now(),skip),skip);
   if(previous && previous.plan.difficulty===difficulty && previous.plan.chapterCount===chapterCount){
     plan={...previous.plan};
     focus=[...previous.focus];
@@ -57,8 +59,15 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
       if(i<0)throw new HttpError(400,'Select a focus card to reroll.');
       const old=focus[i];
       const reserved=new Set([...excluded,...focus.flatMap(item=>[item.word,...item.characters])]);
-      const alternate=targets(buildPlan(store,difficulty,chapterCount,Date.now(),reserved))
-        .filter(item=>!reserved.has(item.word) && item.characters.every(c=>!reserved.has(c)));
+      const alternate=targets(makePlan(reserved))
+        .filter(item=>!reserved.has(item.word) && item.characters.every(c=>!reserved.has(c)))
+        .filter(item=>{
+          if(!plan.characters||item.role==='review')return true;
+          const proposed=focus.map((current,index)=>index===i?item:current);
+          const available=new Set(plan.characters.available+proposed.filter(f=>f.role==='review').map(f=>f.word).join(''));
+          const extra=[...new Set(proposed.map(f=>f.word).join(''))].filter(c=>!available.has(c));
+          return extra.length<=plan.ceiling && extra.every(c=>catalog.characterLevel(c)===plan.characters!.passed+1);
+        });
       const next=alternate.find(item=>item.role===old.role && (item.role!=='new'||item.characters.length<=old.characters.length))
         ??alternate.find(item=>item.role==='review')??backgroundTarget(store,plan,reserved);
       if(!next)throw new HttpError(409,'No more eligible replacements for this card.');
@@ -67,7 +76,7 @@ export function practicePreview(store:ReadingStore,options:{difficulty:Difficult
       for(const c of old.characters)excluded.add(c);
     }
   }else{
-    plan=buildPlan(store,difficulty,chapterCount,Date.now(),excluded);
+    plan=makePlan(excluded);
     focus=targets(plan).slice(0,lengthBudget(storyDifficulty[difficulty].focusCards,plan.chapterCount));
     if(previous?.plan.difficulty===difficulty){
       const priorOrder=new Map(previous.focus.map((item,i)=>[item.word,i]));

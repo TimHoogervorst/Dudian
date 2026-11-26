@@ -87,6 +87,7 @@ export const catalog = {
     return Array.from(text).every(char=>!/\p{Script=Han}/u.test(char)||(levels.get(char)??Infinity)<=level);
   },
   wordLevel(text:string){return wordLevels.get(text);},
+  characterLevel(text:string){return levels.get(text);},
   isCurriculumWord(text:string){return wordLevels.has(text);},
   libraryItems(kind:ItemKind,level:number){
     return (kind==='word'?compoundWords:characters).filter(item=>item.level===level);

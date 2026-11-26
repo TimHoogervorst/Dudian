@@ -107,6 +107,8 @@ test('Hard fills six focus cards with struggling reviews and eligible new charac
 
 test('a reroll replaces one focus, survives resizing, and binds generation to its preview', t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
+  for(const c of '我你是好吗')setStrength(store.db,'character',c,'green');
+  const before=hskReadingProgress(store.db);
   const options={difficulty:'medium',chapterCount:1} as const;
   const first=practicePreview(store,options);
   assert.ok(first.cards.length>=2 && first.cards.length<=6);
@@ -122,11 +124,12 @@ test('a reroll replaces one focus, survives resizing, and binds generation to it
   assert.deepEqual(new Set([...plan.reviewWords,...plan.newWords,...(plan.compound?[plan.compound]:[])]),new Set(words));
   assert.throws(()=>confirmedPlan(store,longer.id,'hard',2));
   assert.ok(longer.projected>second.projected);
-  assert.equal(hskReadingProgress(store.db),0);
+  assert.equal(hskReadingProgress(store.db),before);
 });
 
 test('long Hard stories advance a four-word window by two and shrink back to the short budget',t=>{
   const store=new ReadingStore();t.after(()=>store.db.close());
+  setStrength(store.db,'word','咖啡','yellow');
   const options={difficulty:'hard',chapterCount:5} as const;
   const preview=practicePreview(store,options);
   assert.equal(preview.cards.length,12);

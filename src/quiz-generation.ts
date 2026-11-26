@@ -9,7 +9,7 @@ const punctuation=/^[，。！？、；：“”‘’（）…—《》,.!?:;]+
 
 export async function generateQuestions(chapter:Chapter,plan:StoryPlan,words:string[],write:CandidateWriter,examTargets?:string[]) {
   const allowed=new Set(words);
-  const count=examTargets?.length??storyDifficulty[plan.difficulty].questions;
+  const count=examTargets?.length??(plan.characters?.beginner?1:storyDifficulty[plan.difficulty].questions);
   const assigned=chapter.focus?new Set(chapter.focus):null;
   const targetChars=new Set([...plan.newCharacters,...plan.reviewCharacters??[]].filter(c=>!assigned||assigned.has(c)));
   const source=chapter.paragraphs.map((tokens,i)=>

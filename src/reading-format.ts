@@ -14,8 +14,9 @@ function letterSections(difficulty:Difficulty){
 }
 export function formatRules(plan:StoryPlan){
   const format=plan.format;
+  if(plan.characters?.beginner && format?.type==='book')return 'Write a tiny first reading about 包包:1 greeting the learner. One short sentence on one page is enough for each chapter. Use the starter characters and simple repetition.';
   if(format?.type==='dialogue'){
-    const count=messages[plan.difficulty];
+    const count=plan.characters?.beginner?format.people:messages[plan.difficulty];
     return [
       'Write a natural Mandarin messaging conversation with one theme across chapters. Use short colloquial turns, familiar forms of address and natural omissions. Group chats can answer earlier messages after the topic changes; leave enough context to follow the reply.',
       'Each chapter has exactly '+count+' paragraphs, one message per paragraph. Include names (an array of exactly '+format.people+' distinct short display names) and speakers (one zero-based name index per message). Use every participant and keep names in identical order across chapters. Index 0 represents the learner. Use natural Chinese display names. Names are metadata outside the glossary.'

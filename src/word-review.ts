@@ -12,6 +12,7 @@ export function reviewBoundaries(plan:StoryPlan){
 }
 
 export function planWordReviews(store:ReadingStore,plan:StoryPlan){
+  if(plan.characters?.beginner)return [];
   const boundaries=reviewBoundaries(plan);
   const size={easy:2,medium:5,hard:10}[plan.difficulty];
   const focus=new Set([...plan.newWords,...plan.reviewWords,...(plan.compound?[plan.compound]:[])]);
@@ -33,7 +34,7 @@ export function planWordReviews(store:ReadingStore,plan:StoryPlan){
       if(!pool.includes(word) && catalog.get('word',word))pool.push(word);
       if(pool.length===size)break;
     }
-    if(pool.length<size)throw new Error('Too few distinct story words for a full practice round.');
+    if(!pool.length)return [];
   }
   return boundaries.map((chapter,i)=>{
     const assigned=pool.filter((_,index)=>index%boundaries.length===i);
