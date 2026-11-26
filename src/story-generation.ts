@@ -10,6 +10,7 @@ import { generateText } from './provider.ts';
 import {generateQuestions} from './quiz-generation.ts';
 import {isTranslation} from './paragraph-translation.ts';
 import {numberSentences} from './cover-text.ts';
+import {practiceSenses,resolveStorySenses} from './story-senses.ts';
 
 export type CandidateWriter = (prompt:string) => Promise<string>;
 type Chapter = Story['chapters'][number];
@@ -85,16 +86,10 @@ function tokenFor(raw:unknown,dictionary:Lexicon,sentence:number,chapter:number,
   if (typeof raw === 'string' && /^[，。！？、；：“”‘’（）…—《》,.!?:;]+$/u.test(raw)) return {text:raw,sentence};
   const match = typeof raw === 'string' ? /^([^:\s]+):([1-9]\d*)$/u.exec(raw) : null;
   if(plan.characters && typeof raw==='string'){
-    const form=match?.[1]??raw.split('=')[0];
-    const policy=plan.characters;
-    if(/^\p{Script=Han}+$/u.test(form) && [...form].every(c=>policy.available.includes(c)||catalog.characterLevel(c)===policy.passed+1)){
-      const senses=catalog.get('word',form)?.senses.slice(0,8);
-      if(senses?.length){
-        const sense=match?senses[Number(match[2])-1]:raw===form?(senses.length===1?senses[0]:undefined):
-          senses.find(s=>raw===form+'='+s.meaning);
-        if(sense)return {text:form,entry:form,sense:sense.id,pinyin:sense.pinyin,meaning:sense.meaning,sentence};
-        throw new CandidateError('Choose a sense for '+form+': '+senses.map((s,i)=>form+':'+(i+1)+'='+s.meaning).join(' | '),chapter);
-      }
+    if(match){
+      const form=match[1];
+      const sense=practiceSenses(form,plan.characters)?.[Number(match[2])-1];
+      if(sense)return {text:form,entry:form,sense:sense.id,pinyin:sense.pinyin,meaning:sense.meaning,sentence};
     }
     throw new CandidateError('Unlisted word or ineligible character in '+raw.slice(0,60),chapter);
   }
@@ -314,6 +309,7 @@ export async function generateReading(plan:StoryPlan,write:CandidateWriter,round
       }else if(teaserOnly)candidate.teaser=revision?.teaser;
       else if (chapter === undefined) candidate = revision;
       else candidate.chapters[chapter] = revision;
+      if(plan.characters)await resolveStorySenses(candidate,plan.characters,write);
       const {discoveries,...accepted} = validate(candidate,plan,dictionary);
       const finalPlan={...plan,newCharacters:[...plan.newCharacters,...discoveries]};
       for(const {chapter,words} of rounds){
