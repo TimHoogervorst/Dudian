@@ -1,6 +1,6 @@
 import {ui,el,link,api,pageNavigation} from './ui.js';
 import {reader} from './reader.js';
-import {signIn,accountMenu} from './account.js';
+import {accountMenu} from './account.js';
 import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
@@ -61,11 +61,16 @@ async function render() {
 }
 window.addEventListener('unhandledrejection',e=>{ui.notice(e.reason?.message||'The action could not be completed.');});
 try {
-  const username=await signIn();
+  const {username}=await api('/api/session');
+  if(!username) { location.replace('/login'+location.hash); }
+  else await startReader(username);
+} catch(e){ui.notice(e.message);}
+
+async function startReader(username) {
   nav.after(accountMenu(username));
   const assets=await api('/api/features');
   for(const name of assets.css){ const l=document.createElement('link');l.rel='stylesheet';l.href='/features/'+encodeURIComponent(name);document.head.append(l); }
   for(const name of assets.js){const module=await import('/features/'+encodeURIComponent(name));await module.setup?.(ui);}
   window.addEventListener('hashchange',render);
   await render();
-} catch(e){ui.notice(e.message);}
+}

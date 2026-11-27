@@ -4,6 +4,10 @@ The learner reads Chinese stories and uses encounters with unfamiliar language t
 
 ## Language
 
+**Reader count**
+
+The total number of registered Dudian accounts. Each account counts once, beginning at registration.
+
 **Story catalog**
 
 The collection of stories available to all learners. Each story has a common text and character focus, and each learner has their own reading history with it.

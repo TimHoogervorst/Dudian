@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4e8d5">
+  <title>Log in · Dudian</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/login.css">
+</head>
+<body class="login-page">
+  <div class="login-landscape" aria-hidden="true"><img alt="" hidden><canvas hidden></canvas></div>
+  <div class="login-backdrop" aria-hidden="true" lang="zh-Hans"></div>
+  <main class="login-card">
+    <h1><img class="login-logo" src="/art/dudian-logo.png" alt="Dudian"></h1>
+    <p id="reader-count"></p>
+    <form id="account-form" method="post" action="/api/login" aria-label="Log in">
+      <div class="account-field">
+        <label for="username">Username</label>
+        <div class="field-control"><input id="username" name="username" autocomplete="username" maxlength="40" required></div>
+      </div>
+      <div class="account-field">
+        <label for="password">Password</label>
+        <div class="field-control"><input id="password" name="password" type="password" autocomplete="current-password" required>
+          <button class="password-visibility" type="button" aria-label="Show password" aria-controls="password"></button>
+        </div>
+      </div>
+      <p id="account-error" role="alert"></p>
+      <button class="submit-account" type="submit">Log in</button>
+      <button class="switch-account" type="button">Create an account</button>
+    </form>
+  </main>
+  <script type="module" src="/login.js"></script>
+</body>
+</html>

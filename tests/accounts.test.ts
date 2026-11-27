@@ -18,7 +18,16 @@ test('accounts keep separate bookmarks and can resume on a second browser',async
     assert.equal(response.status,200);
     return response.headers.get('set-cookie')!.split(';')[0];
   };
+  const page=(path:string,cookie='')=>fetch(base+path,{redirect:'manual',headers:{Cookie:cookie}});
+  const count=()=>fetch(base+'/api/reader-count').then(response=>response.json());
+  assert.equal((await page('/')).headers.get('location'),'/login');
+  const login=await (await page('/login')).text();
+  assert.match(login,/aria-label="Log in"/);
+  assert.doesNotMatch(login,/class="masthead"/);
+  assert.deepEqual(await count(),{count:0});
   const tim=await signin('/api/register','Tim','first-password');
+  assert.equal((await page('/login',tim)).headers.get('location'),'/');
+  assert.equal((await page('/',tim)).status,200);
   assert.equal((await post('/api/stories/tea-shop/position',{chapter:0,paragraph:1},tim)).status,200);
   const another=await signin('/api/register','Other','other-password');
   const position=async(cookie:string)=>(await (await fetch(base+'/api/stories/tea-shop',{headers:{Cookie:cookie}})).json()).position;
@@ -29,5 +38,7 @@ test('accounts keep separate bookmarks and can resume on a second browser',async
   assert.equal((await post('/api/register',{username:'TIM',password:'other-password'})).status,409);
   assert.equal((await post('/api/login',{username:'Tim',password:'incorrect-password'})).status,401);
   assert.equal((await post('/api/logout',{},tim)).status,200);
+  assert.deepEqual(await count(),{count:2});
+  assert.equal((await page('/',tim)).headers.get('location'),'/login');
   assert.equal((await fetch(base+'/api/stories',{headers:{Cookie:tim}})).status,401);
 });

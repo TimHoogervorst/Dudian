@@ -63,6 +63,10 @@ export async function createApp(pool: Pool) {
         const account=await sessionAccount(pool,req);
         return json(200,{username:account?.username??null});
       }
+      if (path==='/api/reader-count' && req.method==='GET') {
+        const result = await pool.query('SELECT count(*) AS total FROM accounts');
+        return json(200,{count:Number(result.rows[0].total)});
+      }
       if (req.method==='POST' && ['/api/login','/api/register','/api/logout'].includes(path)) {
         return json(200,await authenticate(pool,path,req,res,path==='/api/logout'?null:await body(req)));
       }
@@ -114,8 +118,20 @@ export async function createApp(pool: Pool) {
         return json(404,{error:'Unknown API endpoint.'});
       }
       if (req.method!=='GET' && req.method!=='HEAD') return json(405,{error:'Method unavailable.'});
-      const artwork = path==='/art/tea-shop.png';
-      const filename = artwork ? join(root,'docs','Street Talk reading week dashboard-2.png') : resolve(publicDir,'.'+(path==='/'?'/index.html':path));
+      const loginPage = path==='/login' || path==='/login.html';
+      if (loginPage || path==='/' || path==='/index.html') {
+        const account = await sessionAccount(pool,req);
+        res.setHeader('Cache-Control','no-store');
+        if ((loginPage && account) || (!loginPage && !account)) {
+          // Browsers carry the original reader fragment across this redirect.
+          res.writeHead(302,{Location:account?'/':'/login'});
+          return res.end();
+        }
+      }
+      const artwork = path==='/art/tea-shop.png' ? 'Street Talk reading week dashboard-2.png'
+        : path==='/art/dudian-logo.png' ? 'dudian-logo.png' : null;
+      const pagePath = loginPage ? '/login.html' : path==='/' ? '/index.html' : path;
+      const filename = artwork ? join(root,'docs',artwork) : resolve(publicDir,'.'+pagePath);
       if ((!artwork && !filename.startsWith(publicDir+sep)) || !existsSync(filename) || !statSync(filename).isFile()) return json(404,{error:'Page not found.'});
       res.writeHead(200,{'Content-Type':mime[extname(filename)]??'application/octet-stream'});
       res.end(req.method==='HEAD'?undefined:readFileSync(filename));
