@@ -9,19 +9,18 @@ const pending=new WeakMap<ReadingStore,Map<string,Promise<string>>>();
 
 export async function paragraphTranslation(store:ReadingStore,id:string,chapter:number,paragraph:number,write=generateText){
   if(!Number.isInteger(chapter)||!Number.isInteger(paragraph))throw new HttpError(400,'Choose a paragraph in this story.');
-  const section=(await store.story(id)).chapters[chapter];
-  const tokens=section?.paragraphs[paragraph];
-  if(!tokens)
-    throw new HttpError(400,'Choose a paragraph in this story.');
-  const cached=section.translations?.[paragraph];
-  if(cached)return cached;
-
   const requests=pending.get(store)??new Map<string,Promise<string>>();
   pending.set(store,requests);
   const key=JSON.stringify([id,chapter,paragraph]);
   const existing=requests.get(key);
   if(existing)return existing;
   const request=(async()=>{
+    const section=(await store.story(id)).chapters[chapter];
+    const tokens=section?.paragraphs[paragraph];
+    if(!tokens)
+      throw new HttpError(400,'Choose a paragraph in this story.');
+    const cached=section.translations?.[paragraph];
+    if(cached)return cached;
     const passage=section.paragraphs.map(p=>p.map(t=>t.text).join(''));
     const result=await write(JSON.stringify({chapter:section.title,paragraphs:passage,translateIndex:paragraph}),
       'Translate only the paragraph at the zero-based translateIndex into natural English. Use the chapter for context. Preserve names and dialogue. Return only its translation as plain English text.');

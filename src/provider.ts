@@ -1,5 +1,7 @@
+import { database,transaction } from './postgres/database.ts';
+import type { Pool } from 'pg';
 import { createHash, createPublicKey, randomBytes, randomUUID, verify } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, unlinkSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -65,14 +67,31 @@ export class PlanConnection {
   private pending?: { state: string, nonce: string, verifier: string, redirect: string, expires: number };
   private request: typeof fetch;
   private refreshing?: Promise<Grant>;
-  constructor(directory: string, request: typeof fetch = fetch) {
+  private shared:boolean;
+  constructor(directory: string, request: typeof fetch = fetch,shared=false) {
+    this.shared=shared;
     this.request = request;
     mkdirSync(directory, {recursive: true, mode: 0o700});
     this.path = join(directory, 'chatgpt-registration.json');
-    this.install = existsSync(this.path)
-      ? JSON.parse(readFileSync(this.path, 'utf8'))
-      : {host: 'urn:uuid:' + randomUUID()};
-    if (!existsSync(this.path)) this.save(this.install);
+    if (!existsSync(this.path)) {
+      // Both services can open a fresh volume. Publish one complete identity without replacing a winner.
+      const tmp=this.path+'.'+randomUUID();
+      writeFileSync(tmp,JSON.stringify({host:'urn:uuid:'+randomUUID()}),{mode:0o600,flag:'wx'});
+      try{linkSync(tmp,this.path);}
+      catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
+      finally{unlinkSync(tmp);}
+    }
+    this.install=JSON.parse(readFileSync(this.path,'utf8'));
+  }
+  private async synchronized<T>(work:()=>Promise<T>):Promise<T>{
+    if(!this.shared)return work();
+    // A rotating provider refresh token has one writer across the two services.
+    registrationPool??=database();
+    return transaction(registrationPool,async db=>{
+      await db.query('SELECT pg_advisory_xact_lock(128014,5)');
+      this.install=JSON.parse(readFileSync(this.path,'utf8'));
+      return work();
+    });
   }
   private save(installation: Installation) {
     const tmp = this.path + '.' + randomUUID();
@@ -112,7 +131,7 @@ export class PlanConnection {
       code_verifier:attempt.verifier,redirect_uri:attempt.redirect});
     const identity = await this.identity(tokens.id_token, client, attempt.nonce);
     if (previous && identity.sub !== previous.subject) throw new Error('Use the originally connected ChatGPT account.');
-    this.save({...this.install, grant: this.grant(tokens, {client,subject:identity.sub,email:identity.email})});
+    await this.synchronized(async()=>this.save({...this.install, grant: this.grant(tokens, {client,subject:identity.sub,email:identity.email})}));
   }
   private async tokens(fields: Record<string,string>) {
     const response = await this.request(auth + '/api/accounts/oauth/token', {method:'POST',
@@ -150,7 +169,8 @@ export class PlanConnection {
     return {...identity,access:tokens.access_token,refresh,expires:Date.now()+1000*tokens.expires_in};
   }
   get connected() { return Boolean(this.install.grant); }
-  private async credentials() {
+  private credentials() {return this.synchronized(()=>this.currentGrant());}
+  private async currentGrant() {
     const grant = this.install.grant;
     if (!grant) throw new Error('Choose Continue with ChatGPT in Settings on your Docker host.');
     if (grant.expires > Date.now()+60000) return grant;
@@ -172,7 +192,7 @@ export class PlanConnection {
   }
   async selectTextModel(model:unknown){
     if(typeof model!=='string'||(model && !(await this.textModels()).includes(model)))throw Error('Choose an available story text model.');
-    this.save({...this.install,textModel:model});
+    await this.synchronized(async()=>this.save({...this.install,textModel:model}));
   }
   async generateText(prompt: string, instructions = 'Return only the requested text.') {
     const models=await this.textModels();
@@ -187,8 +207,9 @@ export class PlanConnection {
   }
 }
 
+let registrationPool:Pool|undefined;
 let defaultConnection: PlanConnection;
 export function connection() {
-  return defaultConnection ??= new PlanConnection(process.env.DATA_DIR || fileURLToPath(new URL('../runtime/',import.meta.url)));
+  return defaultConnection ??= new PlanConnection(process.env.DATA_DIR || fileURLToPath(new URL('../runtime/',import.meta.url)),fetch,Boolean(process.env.PGHOST||process.env.DATABASE_URL));
 }
 export const generateText = (prompt: string, instructions?: string) => connection().generateText(prompt,instructions);

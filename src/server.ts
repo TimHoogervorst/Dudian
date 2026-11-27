@@ -8,7 +8,6 @@ import { strengthFor } from './strength.ts';
 import { storyFocusEntries } from './story-focus.ts';
 import { markAdvance } from './activity.ts';
 import { prepareMilestones } from './milestone-test.ts';
-import { generationWorker } from './generation-job.ts';
 import { database,initializeDatabase } from './postgres/database.ts';
 import { LearnerDatabase } from './postgres/learner-database.ts';
 import { authenticate,sessionAccount } from './postgres/session.ts';
@@ -26,7 +25,7 @@ export interface Context {
 }
 type Handler = (ctx: Context)=>Promise<boolean> | boolean;
 const mime: Record<string,string> = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.woff2':'font/woff2'};
-async function body(req: IncomingMessage) {
+export async function body(req: IncomingMessage) {
   const chunks: Buffer[] = [];
   let length = 0;
   for await (const chunk of req) {
@@ -39,7 +38,6 @@ async function body(req: IncomingMessage) {
 }
 export async function createApp(pool: Pool) {
   await initializeDatabase(pool);
-  await pool.query("UPDATE story_art SET status='failed',error='Drawing was interrupted. Retry the illustration.' WHERE status='drawing'");
   const stores=new Map<string,ReadingStore>();
   const scores=new Map<string,number>();
   const features: Handler[] = [];
@@ -142,8 +140,6 @@ export async function createApp(pool: Pool) {
       json(error.status ?? 500,{error:error.status ? error.message : 'Unable to process request.'});
     }
   });
-  const stop=generationWorker(pool);
-  server.once('close',stop);
   return server;
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href===import.meta.url) {

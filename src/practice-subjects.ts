@@ -33,6 +33,8 @@ const topics=[
   return {zh:words.join(''),en,level:Math.max(...words.map(word=>catalog.wordLevel(word)??6)),keywords:keywords.split(' ')};
 });
 
+export const storySubjects=topics.map(({zh,en,level})=>({zh,en,level}));
+
 export function suggestSubjects(level:number,targets:string[],avoid:Subject[]){
   const band=Math.min(6,Math.floor(level)+1);
   const previous=new Set(avoid.map(subject=>subject.zh));

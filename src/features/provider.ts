@@ -4,9 +4,10 @@ import { connection, generateText } from '../provider.ts';
 
 const port = 14551;
 const origin = 'http://127.0.0.1:' + port;
+let invitation:{key:string,expires:number}|undefined;
 let ready: Promise<void> | undefined;
 
-export function createSignInServer(getConnection = connection) {
+export function createSignInServer(getConnection = connection, privateSetup=false) {
   let session: string | undefined;
   return createServer(async (req, res) => {
     res.setHeader('Cache-Control','no-store');
@@ -19,15 +20,22 @@ export function createSignInServer(getConnection = connection) {
     const url = new URL(req.url ?? '/',origin);
     try {
       if (req.method === 'GET' && url.pathname === '/') {
+        if(privateSetup){
+          if(!invitation || invitation.expires<Date.now() || url.searchParams.get('invite')!==invitation.key){
+            res.writeHead(403).end('Start the connection from Admin Settings.');return;
+          }
+          res.setHeader('Set-Cookie','dudian_provider_setup='+invitation.key+'; HttpOnly; SameSite=Strict; Max-Age=600; Path=/begin');
+        }
         res.setHeader('Content-Type','text/html; charset=utf-8');
         res.end('<!doctype html><html lang="en"><title>Connect Dudian</title><main><h1>Connect Dudian</h1><p>Allow this local app to use your ChatGPT plan for Chinese stories.</p><form action="/begin" method="post"><button data-oai-siwc-button>Continue with ChatGPT</button></form></main></html>');
       } else if (req.method === 'GET' && url.pathname === '/begin') {
         res.writeHead(303,{location:'/'}).end();
       } else if (req.method === 'POST' && url.pathname === '/begin') {
-        if (req.headers.origin !== origin) {
+        if (req.headers.origin !== origin || (privateSetup && (!invitation || invitation.expires<Date.now() || !req.headers.cookie?.split(/;\s*/).includes('dudian_provider_setup='+invitation.key)))) {
           res.writeHead(403,{'Content-Type':'text/plain; charset=utf-8'}).end('Open Dudian Settings on this computer and start sign-in again.');
           return;
         }
+        invitation=undefined;
         session = randomBytes(32).toString('base64url');
         const location = getConnection().begin(origin + '/auth/callback');
         res.setHeader('Set-Cookie','streettalk_signin='+session+'; HttpOnly; SameSite=Lax; Max-Age=600; Path=/auth/callback');
@@ -50,7 +58,7 @@ export function createSignInServer(getConnection = connection) {
 
 function startHostSignIn() {
   if (ready) return ready;
-  const server = createSignInServer();
+  const server = createSignInServer(connection,true);
   ready = new Promise<void>((resolve,reject) => {
     server.once('error',reject);
     server.listen(port, process.env.SIWC_BIND || '127.0.0.1',resolve);
@@ -73,11 +81,12 @@ export function passage(text: string) {
   }
 }
 
-export default async function provider(ctx: any) {
+export async function provider(ctx: any) {
   const {req,url,json} = ctx;
   if (url.pathname === '/api/provider/status' && req.method === 'GET') {
     await startHostSignIn();
-    json(200,{connected:connection().connected,hostSignIn:origin});
+    invitation={key:randomBytes(32).toString('hex'),expires:Date.now()+600000};
+    json(200,{connected:connection().connected,hostSignIn:origin+'/?invite='+invitation.key});
   } else if(url.pathname==='/api/provider/models' && req.method==='GET'){
     const plan=connection();
     json(200,{selected:plan.textModel,models:plan.connected?await plan.textModels():[]});

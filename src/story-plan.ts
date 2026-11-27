@@ -10,6 +10,7 @@ export function validLength(value:unknown): value is number {
 }
 export interface Preferences {difficulty:Difficulty; ceilings:Record<Difficulty,number>}
 export interface StoryPlan {
+  catalogTargets?:string[];
   characters?:import('./practice-characters.ts').PracticeCharacters;
   hskLimit?:number;
   format?:import('./reading-types.ts').ReadingFormat;

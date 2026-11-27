@@ -8,3 +8,7 @@ export function lengthBudget(shortLimit:number,chapters:number){
   const extra=Math.min(shortLimit,2)*(chapters-1);
   return shortLimit+Math.min(extra,Math.max(0,12-shortLimit));
 }
+
+export function focusBudget(difficulty:keyof typeof storyDifficulty,chapters:number){
+  return lengthBudget(storyDifficulty[difficulty].focusCards,chapters);
+}

@@ -19,7 +19,6 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
-      - "127.0.0.1:14551:14551"
     environment:
       DATA_DIR: /data
       PGHOST: postgres
@@ -27,6 +26,30 @@ services:
       PGDATABASE: dudian
       PGPASSWORD: ${POSTGRES_PASSWORD:-dudian-local}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      SIWC_BIND: 0.0.0.0
+      DUDIAN_COVER_JOBS: /cover-jobs
+    volumes:
+      - reader-data:/data
+      - ./.work/cover-jobs:/cover-jobs
+  admin:
+    build: .
+    command: ["node", "--experimental-strip-types", "src/admin/server.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:14551:14551"
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3001
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DATA_DIR: /data
+      PGHOST: postgres
+      PGUSER: dudian
+      PGDATABASE: dudian
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dudian-local}
       SIWC_BIND: 0.0.0.0
       DUDIAN_COVER_JOBS: /cover-jobs
     volumes:

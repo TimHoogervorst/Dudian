@@ -93,49 +93,6 @@ export function setup(ui) {
     if(!stories.length)list.append(el('li','No stories yet.','empty-shelf'));
     return list;
   }
-  async function watchShelf(list,context,refreshLibrary){
-    const {signal,onLeave}=context;
-    const steps=['planning','writing','checking','questions','saving'];
-    const labels={queued:'Waiting for generation',planning:'Planning vocabulary',writing:'Writing chapters',checking:'Checking vocabulary',revising:'Revising chapters',questions:'Preparing questions',saving:'Saving story'};
-    let timer,previous,card;
-    onLeave(()=>clearTimeout(timer));
-    async function poll(){
-      if(signal.aborted)return;
-      let delay=10000;
-      try{
-        const job=await api('/api/generation-job',undefined,signal);
-        if(signal.aborted)return;
-        const snapshot=JSON.stringify(job);
-        if(job && job.stage!=='failed' && job.stage!=='ready')delay=1500;
-        if(snapshot!==previous){
-          if(job && job.stage!=='ready'){
-            if(!card){
-              card=el('li',null,'draft-story');
-              const image=el('img',null,'draft-art');image.alt='';image.src='/baobao.png';
-              card.append(image,el('div',null,'draft-copy'));list.prepend(card);
-            }
-            const failed=job.stage==='failed',copy=card.lastChild;
-            copy.replaceChildren(el('strong',failed?'Generation stopped':'Still generating'),metadata(job));
-            if(failed)copy.append(el('span',[labels[job.failedStage],job.error].filter(Boolean).join(' · ')),link('Try again in Generate','#/practice','text-link'),link('Open Settings','#/settings','text-link'));
-            else{
-              const progress=el('progress');progress.max=steps.length;
-              progress.value=steps.indexOf(job.stage==='revising'?'checking':job.stage);
-              progress.setAttribute('aria-label','Story generation progress');
-              copy.append(progress,el('span',job.detail??labels[job.stage]));
-            }
-          }else if(card || (job?.storyId && !list.querySelector('[data-story-id="'+CSS.escape(job.storyId)+'"]'))){
-            const {stories}=await api(refreshLibrary?'/api/history?focus':'/api/history',undefined,signal);
-            if(signal.aborted)return;
-            const fresh=refreshLibrary?refreshLibrary(stories):listing(stories.slice(0,4));
-            list.replaceWith(fresh);list=fresh;card=undefined;
-          }
-          previous=snapshot;
-        }
-      }catch(error){if(signal.aborted)return;delay=3000;}
-      timer=setTimeout(poll,delay);
-    }
-    await poll();
-  }
   ui.route('home',async context=>{
     const {root,signal}=context;
     const [{stories,current},progress]=await Promise.all([api('/api/history',undefined,signal),api('/api/reading-progress',undefined,signal)]);
@@ -153,7 +110,7 @@ export function setup(ui) {
       actions.append(link('Continue reading →',read(featured),'button'));
       copy.append(titles,actions);
     }else{
-      copy.append(el('h2','Your next story'),link('Create a story →','#/practice','button'));
+      copy.append(el('h2','Your next story'),link('Browse stories →','#/stories','button'));
     }
     hero.append(copy);
     const stats=el('div',null,'dashboard-stats');
@@ -164,7 +121,6 @@ export function setup(ui) {
     bar.append(el('h1','Your stories'),link('See all →','#/stories','text-link'));
     const list=listing(stories.slice(0,4));
     shelf.append(bar,list);root.append(overview,shelf);
-    await watchShelf(list,context,false);
   });
   ui.route('stories',async context=>{
     const {root,signal}=context;
@@ -190,7 +146,6 @@ export function setup(ui) {
       return list;
     }
     root.append(refresh(stories));
-    await watchShelf(list,context,refresh);
   });
   ui.on('reader-ready',async({story,signal,onLeave})=>{
     if(signal.aborted)return;

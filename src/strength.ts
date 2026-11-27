@@ -94,9 +94,13 @@ const curriculumBands=Array.from({length:6},(_,i)=>({
 }));
 
 export async function hskReadingProgress(db:LearnerDatabase, projected=new Map<string,number>()){
-  const earned=curriculumBands.map(()=>0);
   const scores=(await recordedStrengths(db)).filter(item=>!projected.has(item.text));
   for(const [text,score] of projected)scores.push({kind:entryKind('word',text),text,score});
+  return progressForScores(scores);
+}
+
+export function progressForScores(scores:{kind:ItemKind,text:string,score:number}[]){
+  const earned=curriculumBands.map(()=>0);
   for(const {kind,text,score} of scores){
     const band=curriculumBands.findIndex(items=>items[kind].has(text));
     if(band>=0)earned[band]+=Math.max(0,Math.min(statusScores.green,score));

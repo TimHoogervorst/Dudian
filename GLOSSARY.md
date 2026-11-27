@@ -8,9 +8,21 @@ The learner reads Chinese stories and uses encounters with unfamiliar language t
 
 The total number of registered Dudian accounts. Each account counts once, beginning at registration.
 
+**Active learner**
+
+A learner who has read or practiced in the past 30 days.
+
 **Story catalog**
 
 The collection of stories available to all learners. Each story has a common text and character focus, and each learner has their own reading history with it.
+
+**Story suggestion**
+
+A proposed character focus for a new catalog story, ranked by learner need and the practice material already available.
+
+**Catalog coverage**
+
+A learner has coverage for a character when at least one unfinished story fits their reading difficulty and explicitly targets that character for practice.
 
 **Character focus**
 

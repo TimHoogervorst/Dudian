@@ -6,7 +6,6 @@ const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
 document.querySelector('.skip').onclick=event=>{event.preventDefault();root.focus();};
 const tabs=[
-  ['practice','Generate','pencil'],
   ['stories','Library','book'],
   ['library','Dictionary','dictionary'],
   ['progression','Progression','flag'],
@@ -18,30 +17,16 @@ for(const [route,name,mark] of tabs) {
 async function settingsPage(context) {
   const {root}=context;
   root.append(el('h1','Settings'));
-  const jobs=[];
-  for(const [title,sections] of [
-    ['Your preferences',['reading','difficulty']],
-    ['Shared story generation',['connection','artwork']]
-  ]) {
-    const group=el('section',null,'settings-group');
-    group.append(el('h2',title));
-    for(const section of sections){
-      const slot=el('div',null,'settings-card');
-      group.append(slot);
-      jobs.push(ui.emit('settings-'+section,{...context,root:slot}).catch(error=>{
-        if(!context.signal.aborted)slot.append(el('p',error.message));
-      }));
-    }
-    root.append(group);
-  }
-  await Promise.all(jobs);
+  const group=el('section',null,'settings-group'),slot=el('div',null,'settings-card');
+  group.append(el('h2','Your preferences'),slot);root.append(group);
+  await ui.emit('settings-reading',{...context,root:slot});
 }
 const pages={read:reader,settings:settingsPage};
 const navigation=pageNavigation(error=>ui.notice(error.message));
 async function render() {
   const session=navigation.next();
   const [route='home',...parts]=location.hash.replace(/^#\/?/,'').split('/').filter(Boolean).map(decodeURIComponent);
-  const name=route==='reading'?'practice':route;
+  const name=['reading','practice'].includes(route)?'stories':route;
   const page=el('div',null,'page page-'+(Object.hasOwn(pages,name)||ui.routes.has(name)?name:'missing'));
   root.replaceChildren(page);ui.notice('');
   const tab=tabs.find(([route])=>route===name);

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#faf0de">
+  <title>Dudian · Admin center</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/builder.css">
+  <link rel="stylesheet" href="/admin.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="masthead"><div class="mast-inner">
+    <a href="#overview" class="brand"><img src="/art/dudian-logo.png" alt="Dudian"><span>Admin center</span></a>
+    <nav id="nav" aria-label="Admin pages" hidden></nav>
+    <details class="account-menu" hidden><summary aria-label="Administrator account"></summary>
+      <div class="account-panel">
+        <div class="account-identity"><small>Signed in as</small><strong>Administrator</strong></div>
+        <a href="#settings" id="settings-link">Settings</a><button type="button" id="logout">Sign out</button>
+      </div>
+    </details>
+  </div></header>
+  <main id="content" tabindex="-1"></main>
+  <div id="notice" role="status" aria-live="polite"></div>
+</body></html>

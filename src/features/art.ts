@@ -17,7 +17,11 @@ async function upload(req:IncomingMessage) {
   imageType(bytes);
   return bytes;
 }
-export default async function art({url,req,res,store,json,body}:Context) {
+export default async function art(ctx:Context) {
+  if(ctx.req.method!=='GET' || ctx.url.pathname==='/api/art-settings')return false;
+  return catalogArt(ctx);
+}
+export async function catalogArt({url,req,res,store,json,body}:Context) {
   function image(bytes:Buffer){
     res.writeHead(200,{'Content-Type':imageType(bytes),'Cache-Control':'no-store'});
     res.end(bytes);

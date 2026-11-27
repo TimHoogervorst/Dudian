@@ -1,6 +1,6 @@
 # Connect a ChatGPT plan
 
-1. On the PC running Docker, open [Dudian Settings](http://localhost:3000/#/settings) and choose **Continue with ChatGPT**.
+1. On the PC running Docker, open [Admin Settings](http://127.0.0.1:3001/#settings), sign in, and choose **Connect catalog AI**.
 2. A new tab opens at `127.0.0.1:14551`. Choose **Continue with ChatGPT** there as well. This local page starts the handoff to OpenAI.
 3. On OpenAI’s page, sign in with the ChatGPT account you want to use and approve Dudian’s plan permission. Keep using the same browser until the local tab confirms that Dudian is connected.
 4. Return to Settings and choose **Try a short passage**. Chinese text verifies that the connection can generate content. Your phone can now use the same backend.
@@ -13,11 +13,11 @@ The service registers its own public OAuth client and uses the account’s adver
 
 ## Story illustrations
 
-Open a new story’s cover and expand **Cover artwork**. Use **Copy illustration prompt** and **Download 包包 reference** in ChatGPT Images, then use **Import cover** to attach the finished PNG, JPEG, or WebP. The import updates that story’s thumbnail. Replace the shared portrait under **Settings → Story artwork**.
+In the admin center, open a story and expand **Cover artwork**. Copy the illustration prompt and use **Download reference portrait** in ChatGPT Images, then use **Import cover** to attach the finished PNG, JPEG, or WebP. The import updates that story’s thumbnail. Replace the shared portrait under **Settings → Cover artwork**.
 
-**ChatGPT subscription (Codex)** is the default artwork provider. The local cover worker uses the host’s Codex CLI, signed in with ChatGPT, to illustrate scenes with the saved portrait. Covers consume included Codex usage. The reader and the worker exchange files through `.work/cover-jobs`. The Docker container has no need for the host’s Codex credentials.
+**ChatGPT subscription (Codex)** is the default artwork provider. The local cover worker uses the host’s Codex CLI, signed in with ChatGPT, to illustrate scenes with the saved portrait. Covers consume included Codex usage. The admin service and the worker exchange files through `.work/cover-jobs`. The Docker container has no need for the host’s Codex credentials.
 
-On Windows, run `powershell -NoProfile -File scripts/start-cover-worker.ps1` from the project after signing in with `codex login`. On other hosts run `node scripts/cover-worker.mjs` with the native Codex executable on PATH (or set `DUDIAN_CODEX_BIN` to its path). Run the worker at login if the reader is used across host restarts. **Settings → Story artwork** shows the worker’s connection status. **Generate cover** and **Retry illustration** use the selected provider. The automatic checkbox also starts a cover whenever a new story finishes generating.
+On Windows, run `powershell -NoProfile -File scripts/start-cover-worker.ps1` from the project after signing in with `codex login`. On other hosts run `node scripts/cover-worker.mjs` with the native Codex executable on PATH (or set `DUDIAN_CODEX_BIN` to its path). Run the worker at login if the reader is used across host restarts. **Settings → Cover artwork** shows the worker’s connection status. **Generate or retry cover** uses the selected provider. The automatic checkbox also starts a cover whenever a new story finishes generating.
 
 Separately billed images require explicitly selecting **OpenAI API** and supplying a key. A subscription failure stays on the subscription path, and the cover can be retried when the worker or usage allowance is available. [Codex image generation](https://learn.chatgpt.com/docs/image-generation) · [OpenAI image API](https://developers.openai.com/api/docs/guides/image-generation)
 

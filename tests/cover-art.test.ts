@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { ReadingStore } from '../src/store.ts';
-import { createApp } from '../src/server.ts';
+import { createAdmin } from '../src/admin/server.ts';
 import { artSettings,queueArtwork,setArtSettings } from '../src/cover-art.ts';
 import { recordAction } from '../src/word-actions.ts';
 import { finishChapter } from '../src/completion.ts';
@@ -60,26 +60,28 @@ test('a cast lookup or difficulty mark and chapter completion give no vocabulary
 
 test('cover defaults, API key privacy, edits, failures, retries and manual import survive competing work',async t=>{
   const store=await fixture();
-  const server=await createApp(store.db.pool);
+  const server=await createAdmin(store.db.pool,'admin','test-password');
   server.listen(0,'127.0.0.1');await once(server,'listening');
   t.after(()=>{server.close();});
   const address=server.address();
   assert.ok(address && typeof address==='object');
   const base='http://127.0.0.1:'+address.port;
+  const {token}=await (await fetch(base+'/api/login',{method:'POST',body:JSON.stringify({username:'admin',password:'test-password'})})).json();
+  const adminFetch=(url:string,options:RequestInit={})=>fetch(url,{...options,headers:{Authorization:'Bearer '+token}});
   const path=base+'/api/stories/rain/art/';
   assert.deepEqual(await artSettings(store),{enabled:true,configured:false,provider:'subscription',apiModel:'gpt-image-2.5-sunburst',codexModel:''});
-  const fallback=Buffer.from(await (await store.fetch(path+'image')).arrayBuffer());
+  const fallback=Buffer.from(await (await adminFetch(path+'image')).arrayBuffer());
   assert.ok(fallback.length>100);
   await setArtSettings(store,{provider:'api',enabled:false});
-  assert.equal((await store.fetch(path+'retry',{method:'POST'})).status,409);
+  assert.equal((await adminFetch(path+'retry',{method:'POST'})).status,409);
   await setArtSettings(store,{provider:'api',enabled:true,key:'test-only',apiModel:'gpt-image-2.6-flare'});
-  const settings=await (await store.fetch(base+'/api/art-settings')).json();
+  const settings=await (await adminFetch(base+'/api/art-settings')).json();
   assert.equal(settings.provider,'api');
   assert.equal(settings.configured,true);
   assert.ok(!('key' in settings));
   await queueArtwork(store,'rain',async()=>new Response(null,{status:403}));
   await waitForArt(store,'rain','failed');
-  assert.equal((await (await store.fetch(path+'status')).json()).status,'failed');
+  assert.equal((await (await adminFetch(path+'status')).json()).status,'failed');
   const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV1sAAAAASUVORK5CYII=','base64');
   let finish!:(value:Response)=>void;
   const waiting=new Promise<Response>(resolve=>{finish=resolve;});
@@ -93,12 +95,12 @@ test('cover defaults, API key privacy, edits, failures, retries and manual impor
     return waiting;
   });
   await waitForArt(store,'rain','drawing');
-  assert.equal((await (await store.fetch(path+'status')).json()).status,'drawing');
-  assert.equal((await store.fetch(path+'image',{method:'POST',body:png})).status,200);
+  assert.equal((await (await adminFetch(path+'status')).json()).status,'drawing');
+  assert.equal((await adminFetch(path+'image',{method:'POST',body:png})).status,200);
   finish(Response.json({data:[{b64_json:fallback.toString('base64')}]}));
   await waitForArt(store,'rain','imported');
-  assert.equal((await (await store.fetch(path+'status')).json()).status,'imported');
-  assert.deepEqual(Buffer.from(await (await store.fetch(path+'image')).arrayBuffer()),png);
+  assert.equal((await (await adminFetch(path+'status')).json()).status,'imported');
+  assert.deepEqual(Buffer.from(await (await adminFetch(path+'image')).arrayBuffer()),png);
 });
 
 test('artwork for a document uses its prompt without a character portrait',async t=>{

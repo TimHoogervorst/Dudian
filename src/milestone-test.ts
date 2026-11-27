@@ -176,6 +176,7 @@ export async function saveDraft(db:LearnerDatabase,id:string,section:number,task
       if(new Set(filled).size!==filled.length)throw new HttpError(400,'Choose a distinct meaning for each word.');
       a.answers=a.answers.filter(d=>d.section!==section||d.task!==task);
       a.answers.push({section,task,answers});
+      if(filled.length)await db.prepare('UPDATE score_tracking SET last_milestone_practice=$1 WHERE id=1').run(Date.now());
     }
     await db.prepare('UPDATE milestone_tests SET position=$1,answers=$2 WHERE id=$3').run(section,JSON.stringify(a.answers),id);
   });

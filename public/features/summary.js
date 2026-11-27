@@ -116,7 +116,7 @@ export function setup(ui) {
     }else{
       root.append(el('p','You finished this story without marking a word as difficult.'));
     }
-    actions.append(link('Back to Generate','#/practice',result.marked.length?'summary-back':'button'));
+    actions.append(link('Back to Library','#/stories',result.marked.length?'summary-back':'button'));
     root.append(actions);
     const rating=el('section',null,'summary-rating');
     rating.append(el('span','Did you enjoy this story?'));

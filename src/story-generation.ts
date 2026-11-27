@@ -1,5 +1,6 @@
 import { coverTemplate } from './cover-template.ts';
 import { articleSectionsValid,bookWithCast,formatRules } from './reading-format.ts';
+import { lengthBudget,storyDifficulty } from './story-difficulty.ts';
 import { messages } from './reading-types.ts';
 import { planWordReviews,wordReviewCards } from './word-review.ts';
 import { randomUUID } from 'node:crypto';
@@ -68,9 +69,10 @@ function promptFor(plan:StoryPlan,dictionary:Lexicon) {
       'For a word without listed sense numbers, provide its English dictionary meaning as FORM=meaning or give the bare form for an unambiguous word.',
       ...(bookWithCast(plan)?['The cast name 包包:1 is allowed separately.']:[]),
     ]:['Use only listed forms'+(bookWithCast(plan)?' and the cast name 包包:1':'')+'. Segment at natural word boundaries.']),
+    ...(plan.catalogTargets?['Aim to practice these characters across distinct sentences: '+plan.catalogTargets.join('、')+'. Use each independently or in different words where the vocabulary ceiling allows.']:[]),
     'Write exactly '+plan.chapterCount+' chapter(s).',
-    'Use each teaching word at least once: '+[...plan.newWords,...(plan.compound?[plan.compound]:[])].join('、'),
-    ...(plan.chapterCount>1?['Introduce and revisit focus words according to the chapter schedule. Build each scene around its assigned words. Avoid front-loading later targets.',
+    ...(plan.catalogTargets?[]:['Use each teaching word at least once: '+[...plan.newWords,...(plan.compound?[plan.compound]:[])].join('、')]),
+    ...(plan.chapterCount>1&&!plan.catalogTargets?['Introduce and revisit focus words according to the chapter schedule. Build each scene around its assigned words. Avoid front-loading later targets.',
       ...chapterFocus(plan).map((words,i)=>'Chapter '+(i+1)+' focus (use each exact segmented word): '+words.join('、'))]:[]),
     'Reuse each review word in at least two distinct sentences: '+plan.reviewWords.join('、'),
     ...(hints.length?['Common word senses (other eligible words may also be used): '+hints.join(' | ')]:[]),
@@ -174,7 +176,7 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
       throw new CandidateError('Each '+plan.difficulty+' chapter requires '+min+' to '+max+' paragraphs.',i);
     if(chapter.paragraphs.some(tokens=>tokens.filter(t=>t.entry||t.cast).length>60))
       throw new CandidateError('Shorten each paragraph to at most 60 words.',i);
-    if(plan.chapterCount>1){
+    if(plan.chapterCount>1 && !plan.catalogTargets){
       const assigned=schedule[i];
       const present=new Set(chapter.paragraphs.flat().map(token=>token.entry));
       const missing=assigned.filter(word=>!present.has(word));
@@ -191,17 +193,17 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
     sentencesByWord.get(token.text)!.add([c,p,token.sentence].join('/'));
   })));
   const words = [...sentencesByWord.keys()];
-  for (const char of plan.newCharacters) {
+  for (const char of plan.catalogTargets?[]:plan.newCharacters) {
     if (!words.some(word => word.includes(char))) throw new CandidateError('Missing target character '+char,0);
   }
-  for (const word of [...plan.newWords,...(plan.compound?[plan.compound]:[])]) {
+  for (const word of plan.catalogTargets?[]:[...plan.newWords,...(plan.compound?[plan.compound]:[])]) {
     if (!sentencesByWord.has(word)) throw new CandidateError('Missing teaching word '+word,0);
   }
   for (const word of plan.reviewWords) {
     if ((sentencesByWord.get(word)?.size ?? 0)<2) throw new CandidateError('Use '+word+' in two separate sentences.',0);
   }
   const backgroundCharacters = new Set(plan.characters?.available??plan.background.join(''));
-  const novel = new Set(plan.newCharacters.filter(c=>!plan.characters||!backgroundCharacters.has(c)));
+  const novel = new Set((plan.catalogTargets?[]:plan.newCharacters).filter(c=>!plan.characters||!backgroundCharacters.has(c)));
   for(const [i,chapter] of chapters.entries())for(const [p,paragraph] of chapter.paragraphs.entries())for(const token of paragraph){
     if(!token.entry)continue;
     for(const char of token.text)if(!backgroundCharacters.has(char))novel.add(char);
@@ -240,6 +242,34 @@ function validate(candidate:any, plan:StoryPlan, dictionary:Lexicon) {
   const discoveries=plan.characters?[...novel].filter(c=>!plan.newCharacters.includes(c)):[];
   for(const chapter of chapters)if(chapter.focus)chapter.focus.push(...discoveries.filter(c=>chapter.paragraphs.some(p=>p.some(t=>t.entry?.includes(c)))));
   return {title:titleText,chapters,cover:{teaser,tokens,...artwork},discoveries};
+}
+
+function verifiedPlan(plan:StoryPlan, chapters:Chapter[]):StoryPlan {
+  const evidence=new Map<string,{sentences:Set<string>,words:Set<string>}>();
+  chapters.forEach((chapter,c)=>chapter.paragraphs.forEach((paragraph,p)=>{
+    for(const token of paragraph){
+      if(!token.entry)continue;
+      for(const char of new Set(token.entry)){
+        const level=catalog.characterLevel(char);
+        if(!level || level>plan.hskLimit!)continue;
+        const item=evidence.get(char)??{sentences:new Set<string>(),words:new Set<string>()};
+        item.sentences.add([c,p,token.sentence].join('/'));
+        item.words.add(token.entry);
+        evidence.set(char,item);
+      }
+    }
+  }));
+  const eligible=[...evidence].filter(([char,item])=>item.sentences.size>=2 && (item.words.has(char)||item.words.size>=2));
+  eligible.sort(([a,x],[b,y])=>Number(plan.catalogTargets!.includes(b))-Number(plan.catalogTargets!.includes(a))
+    || Number(catalog.characterLevel(b)===plan.hskLimit)-Number(catalog.characterLevel(a)===plan.hskLimit)
+    || y.sentences.size-x.sentences.size || a.localeCompare(b));
+  const focus=eligible.slice(0,lengthBudget(storyDifficulty[plan.difficulty].focusCards,plan.chapterCount)).map(([char])=>char);
+  if(!focus.length)throw new CandidateError('Practice a target character across two sentences, alone or in different words.',0);
+  for(const chapter of chapters){
+    const text=chapter.paragraphs.flat().map(token=>token.entry??'').join('');
+    chapter.focus=focus.filter(char=>text.includes(char));
+  }
+  return {...plan,newCharacters:focus,newWords:[],reviewWords:[],reviewCharacters:[],compound:undefined};
 }
 
 function previewFor(plan:StoryPlan,chapters:Chapter[]) {
@@ -311,7 +341,7 @@ export async function generateReading(plan:StoryPlan,write:CandidateWriter,round
       else candidate.chapters[chapter] = revision;
       if(plan.characters)await resolveStorySenses(candidate,plan.characters,write);
       const {discoveries,...accepted} = validate(candidate,plan,dictionary);
-      const finalPlan={...plan,newCharacters:[...plan.newCharacters,...discoveries]};
+      const finalPlan=plan.catalogTargets?verifiedPlan(plan,accepted.chapters):{...plan,newCharacters:[...plan.newCharacters,...discoveries]};
       for(const {chapter,words} of rounds){
         const seen=new Set(accepted.chapters.slice(0,chapter+1).flatMap(c=>c.paragraphs.flat()).map(t=>t.entry));
         const missing=words.filter(word=>!seen.has(word));
@@ -322,7 +352,7 @@ export async function generateReading(plan:StoryPlan,write:CandidateWriter,round
         const {pinyin,meaning}=tokens.find(t=>t.entry===text)!;
         return {text,pinyin,meaning};
       });
-      const story={id:randomUUID(),difficulty:plan.difficulty,format:plan.format,...accepted,
+      const story={id:randomUUID(),...(plan.catalogTargets?{targetBand:plan.hskLimit}:{}),difficulty:plan.difficulty,format:plan.format,...accepted,
         preview:{...previewFor(finalPlan,accepted.chapters),wordReview}};
       report('questions');
       for(const section of story.chapters){
