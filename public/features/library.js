@@ -57,9 +57,17 @@ async function renderList(root, kind, level, page, size, query, filter,signal) {
   const grid = el('div',null,'lib-grid');
   function tileFor(item) {
     const tile = link('',detail(kind,item.text,item.sense),'lib-tile lib-'+item.color);
-    tile.title = item.meaning;
-    tile.setAttribute('aria-label',item.text+' · '+item.pinyin+' · '+labels[item.color]);
-    tile.append(el('strong',item.text),el('span',item.pinyin));
+    const status=labels[item.color];
+    const gloss=item.meaning?.split(';')[0].trim() || item.meaning;
+    tile.setAttribute('aria-label',[item.text,item.pinyin,status,gloss].filter(Boolean).join(' · '));
+    const badge=el('span',null,'tile-badge');
+    badge.append(el('span',status,'tile-status-label'));
+    const headword=el('strong',item.text);
+    headword.lang='zh-Hans';
+    const reading=el('div',null,'tile-reading');
+    reading.append(headword,el('span',item.pinyin));
+    tile.append(badge,reading);
+    if(gloss)tile.append(el('small',gloss,'tile-gloss'));
     return tile;
   }
   const pages = el('nav',null,'lib-pages');

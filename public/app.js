@@ -1,6 +1,6 @@
 import {ui,el,link,api,pageNavigation} from './ui.js';
 import {reader} from './reader.js';
-import {signIn} from './account.js';
+import {signIn,accountMenu} from './account.js';
 import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
@@ -10,13 +10,33 @@ const tabs=[
   ['stories','Library','book'],
   ['library','Dictionary','dictionary'],
   ['progression','Progression','flag'],
-  ['settings','Settings','settings'],
 ];
 for(const [route,name,mark] of tabs) {
   const a=link(name,'#/'+route);
   a.prepend(icon(mark));nav.append(a);
 }
-const pages={read:reader,settings:({root})=>root.append(el('h1','Settings'))};
+async function settingsPage(context) {
+  const {root}=context;
+  root.append(el('h1','Settings'));
+  const jobs=[];
+  for(const [title,sections] of [
+    ['Your preferences',['reading','difficulty']],
+    ['Shared story generation',['connection','artwork']]
+  ]) {
+    const group=el('section',null,'settings-group');
+    group.append(el('h2',title));
+    for(const section of sections){
+      const slot=el('div',null,'settings-card');
+      group.append(slot);
+      jobs.push(ui.emit('settings-'+section,{...context,root:slot}).catch(error=>{
+        if(!context.signal.aborted)slot.append(el('p',error.message));
+      }));
+    }
+    root.append(group);
+  }
+  await Promise.all(jobs);
+}
+const pages={read:reader,settings:settingsPage};
 const navigation=pageNavigation(error=>ui.notice(error.message));
 async function render() {
   const session=navigation.next();
@@ -42,11 +62,7 @@ async function render() {
 window.addEventListener('unhandledrejection',e=>{ui.notice(e.reason?.message||'The action could not be completed.');});
 try {
   const username=await signIn();
-  const logout=el('button','Log out');
-  logout.type='button';
-  logout.setAttribute('aria-label','Log out of '+username);
-  logout.onclick=async()=>{await api('/api/logout',{});location.reload();};
-  nav.append(logout);
+  nav.after(accountMenu(username));
   const assets=await api('/api/features');
   for(const name of assets.css){ const l=document.createElement('link');l.rel='stylesheet';l.href='/features/'+encodeURIComponent(name);document.head.append(l); }
   for(const name of assets.js){const module=await import('/features/'+encodeURIComponent(name));await module.setup?.(ui);}

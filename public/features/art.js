@@ -84,7 +84,7 @@ export function setup(ui){
     root.append(link('← Dictionary','#/library','text-link'),el('h1','Meet the cast'),img,el('h2','包包 · Bāobāo'),
       el('p','Our little steamed-bun friend carries a green satchel and finds adventures in everyday life.'));
   });
-  ui.on('settings',async({root,signal})=>{
+  ui.on('settings-artwork',async({root,signal})=>{
     const saved=await api('/api/art-settings',undefined,signal);
     const section=el('section',null,'story-settings');
     const enabled=el('input');enabled.type='checkbox';enabled.checked=saved.enabled;
@@ -127,7 +127,7 @@ export function setup(ui){
         status.textContent='Artwork settings saved.';
       }catch(error){status.textContent=error.message;}finally{save.disabled=false;}
     };
-    section.append(el('h2','Story artwork'),form,uploadButton('Replace 包包 reference portrait',portrait,()=>{}));
+    section.append(el('h3','Story artwork'),form,uploadButton('Replace 包包 reference portrait',portrait,()=>{}));
     root.append(section);
   });
 }

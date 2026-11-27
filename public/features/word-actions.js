@@ -6,7 +6,7 @@ import {icon} from '../icons.js';
 const actionId=()=>Array.from(crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16).padStart(8,'0')).join('');
 
 export function setup(ui) {
-  ui.on('settings',async ({root})=>{
+  ui.on('settings-reading',async ({root})=>{
     const {pinyin}=await api('/api/reader-preferences');
     const panel=el('section',null,'reader-pref');
     const label=el('label');
@@ -17,7 +17,7 @@ export function setup(ui) {
       catch(error){input.checked=!input.checked;ui.notice(error.message);}
       finally{input.disabled=false;}
     };
-    label.append(input,' Show pinyin above words');panel.append(el('h2','Reading'),label);root.append(panel);
+    label.append(input,' Show pinyin above words');panel.append(el('h3','Reading'),label);root.append(panel);
   });
   async function bindWords(context){
     const {story,position,article,aside,definition}=context;

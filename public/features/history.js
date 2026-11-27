@@ -1,5 +1,6 @@
 import {readingProgress} from '../reading-progress.js';
 import {coverImage} from './art.js';
+import {matchesStory,storySearch,storyStatus,storyStatuses} from '../story-search.js';
 export function setup(ui) {
   const {el,link,api}=ui;
   const read=story=>'#/read/'+encodeURIComponent(story.id);
@@ -9,8 +10,8 @@ export function setup(ui) {
     return el('span',[level,difficulty?difficulty[0].toUpperCase()+difficulty.slice(1):'Difficulty unrecorded'].filter(Boolean).join(' · '),'story-metadata');
   }
   function statusBadge(story){
-    const state=story.finished?'finished':story.opened?'reading':'new';
-    const badge=el('span',{finished:'Finished',reading:'In progress',new:'Not started'}[state],'gallery-status '+state);
+    const state=storyStatus(story);
+    const badge=el('span',storyStatuses[state],'gallery-status '+state);
     const symbol=el('span',state==='finished'?'✓':'','gallery-status-icon');
     symbol.setAttribute('aria-hidden','true');badge.prepend(symbol);
     return badge;
@@ -30,7 +31,7 @@ export function setup(ui) {
     if(story)frame.append(statusBadge(story));
     return frame;
   }
-  function listing(stories,manage=false) {
+  function listing(stories,manage=false,onHide) {
     const list=el('ul',null,'story-shelf');
     for(const story of stories) {
       const item=el('li');
@@ -46,6 +47,22 @@ export function setup(ui) {
         title.append(storyLink);
         const copy=el('div',null,'shelf-copy');
         copy.append(title,metadata(story));
+        const strong=(story.focus??[]).filter(entry=>entry.strong && /^\p{Script=Han}$/u.test(entry.text));
+        if(strong.length){
+          const preview=el('div',null,'story-focus-preview');
+          preview.append(el('small','Strong focus'));
+          const characters=el('div',null,'story-focus-characters');
+          for(const entry of strong.slice(0,3)){
+            const label=el('span');
+            const hanzi=el('b',entry.text);
+            hanzi.lang='zh-Hans';
+            label.append(hanzi,' '+(entry.pinyin??''));
+            characters.append(label);
+          }
+          if(strong.length>3)characters.append(el('span','+'+(strong.length-3)));
+          preview.append(characters);
+          copy.append(preview);
+        }
         item.append(cover,copy);
         const menu=el('details',null,'story-menu');
         menu.name='story-actions';
@@ -59,7 +76,7 @@ export function setup(ui) {
             await api('/api/stories/'+encodeURIComponent(story.id)+'/hide',{});
             const next=item.nextElementSibling??item.previousElementSibling;
             item.remove();
-            if(!list.children.length)list.append(el('li','No stories yet.','empty-shelf'));
+            onHide?.(story.id);
             next?.querySelector('summary')?.focus();
           }catch(error){ui.notice(error.message);remove.disabled=false;}
         };
@@ -76,7 +93,7 @@ export function setup(ui) {
     if(!stories.length)list.append(el('li','No stories yet.','empty-shelf'));
     return list;
   }
-  async function watchShelf(list,context,manage){
+  async function watchShelf(list,context,refreshLibrary){
     const {signal,onLeave}=context;
     const steps=['planning','writing','checking','questions','saving'];
     const labels={queued:'Waiting for generation',planning:'Planning vocabulary',writing:'Writing chapters',checking:'Checking vocabulary',revising:'Revising chapters',questions:'Preparing questions',saving:'Saving story'};
@@ -107,9 +124,9 @@ export function setup(ui) {
               copy.append(progress,el('span',job.detail??labels[job.stage]));
             }
           }else if(card || (job?.storyId && !list.querySelector('[data-story-id="'+CSS.escape(job.storyId)+'"]'))){
-            const {stories}=await api('/api/history',undefined,signal);
+            const {stories}=await api(refreshLibrary?'/api/history?focus':'/api/history',undefined,signal);
             if(signal.aborted)return;
-            const fresh=listing(manage?stories:stories.slice(0,4),manage);
+            const fresh=refreshLibrary?refreshLibrary(stories):listing(stories.slice(0,4));
             list.replaceWith(fresh);list=fresh;card=undefined;
           }
           previous=snapshot;
@@ -151,11 +168,29 @@ export function setup(ui) {
   });
   ui.route('stories',async context=>{
     const {root,signal}=context;
-    const {stories}=await api('/api/history',undefined,signal);
+    const {stories}=await api('/api/history?focus',undefined,signal);
     if(signal.aborted)return;
-    const list=listing(stories,true);
-    root.append(link('← Reading desk','#/home','text-link'),el('h1','Your stories'),list);
-    await watchShelf(list,context,true);
+    let list,byId;
+    const search=storySearch(root,context.parts,filter);
+    function filter(){
+      const filters=search.filters();
+      let visible=0;
+      for(const item of list.querySelectorAll('[data-story-id]')){
+        item.hidden=!matchesStory(byId.get(item.dataset.storyId),filters);
+        if(!item.hidden)visible++;
+      }
+      search.count.textContent=visible+(visible===1?' story':' stories');
+      list.querySelector('.empty-shelf')?.remove();
+      if(!visible)list.append(el('li',byId.size?'No stories match these filters.':'No stories yet.','empty-shelf'));
+    }
+    function refresh(stories){
+      byId=new Map(stories.map(story=>[story.id,story]));
+      list=listing(stories,true,id=>{byId.delete(id);filter();});
+      filter();
+      return list;
+    }
+    root.append(refresh(stories));
+    await watchShelf(list,context,refresh);
   });
   ui.on('reader-ready',async({story,signal,onLeave})=>{
     if(signal.aborted)return;

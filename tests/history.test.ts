@@ -33,6 +33,7 @@ test('shelf labels show the highest qualifying band and preserve saved difficult
   assert.equal(story.hskLevel,3);
   assert.equal(story.difficulty,'hard');
   assert.equal(list.find(s=>s.id==='tea-shop')?.difficulty,null);
+  assert.deepEqual((await history(store,true)).stories.find(s=>s.id==='labels')?.focus,[]);
 });
 
 test('story tags count occurrences by band and replace legacy highest-word badges',async t=>{

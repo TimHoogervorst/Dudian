@@ -1,7 +1,7 @@
 export function setup(ui) {
-  ui.on('settings', async ({root}) => {
+  ui.on('settings-connection', async ({root}) => {
     const section = document.createElement('section');
-    section.innerHTML = '<h2>ChatGPT connection</h2><p class="connection-state" role="status"></p><a class="connect" data-oai-siwc-button target="_blank" rel="noopener noreferrer">Continue with ChatGPT</a> <button class="test-passage">Try a short passage</button><p>Connect from the browser on your Docker host. <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">View plan usage</a></p><p class="passage-result" aria-live="polite"></p>';
+    section.innerHTML = '<h3>ChatGPT connection</h3><p class="connection-state" role="status"></p><a class="connect" data-oai-siwc-button target="_blank" rel="noopener noreferrer">Continue with ChatGPT</a> <button class="test-passage">Try a short passage</button><p>Connect from the browser on your Docker host. <a href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">View plan usage</a></p><p class="passage-result" aria-live="polite"></p>';
     root.append(section);
     const status = section.querySelector('.connection-state');
     const check = async () => {

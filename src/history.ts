@@ -1,5 +1,6 @@
 import { type ReadingStore,type Story } from './store.ts';
 import { catalog } from './catalog.ts';
+import { storyFocusEntries } from './story-focus.ts';
 
 export async function openStory(store:ReadingStore,id:string,at=Date.now()) {
   await store.story(id);
@@ -13,7 +14,7 @@ function storyTags(counts:number[]){
   return counts.flatMap((count,index)=>count>0 && count*10>=total?[index+1]:[]);
 }
 
-export async function history(store:ReadingStore) {
+export async function history(store:ReadingStore,includeFocus=false) {
 
   const missing=await store.db.prepare('SELECT s.id,s.content FROM stories s LEFT JOIN story_levels l ON l.id=s.id WHERE l.counts IS NULL').all();
   const save=store.db.prepare('INSERT INTO story_levels(id,counts) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET counts=excluded.counts');
@@ -30,6 +31,7 @@ export async function history(store:ReadingStore) {
   const rows=await store.db.prepare(`
     SELECT s.id,s.title,s.created_at,l.counts,s.content->>'difficulty' difficulty,(s.content->'cover') IS NOT NULL AS has_cover,coalesce(p.chapter,0) chapter,coalesce(p.paragraph,0) paragraph,
       s.content->'chapters'->coalesce(p.chapter,0)->>'title' chapter_title,
+      ${includeFocus?"s.content->'preview' preview,":''}
       jsonb_array_length(s.content->'chapters') chapter_count,
       coalesce(o.at,p.updated_at) opened, c.story_id IS NOT NULL finished,a.status AS art_status
     FROM stories s
@@ -44,6 +46,7 @@ export async function history(store:ReadingStore) {
   const stories=rows.map(row=>{
     const hskTags=storyTags(JSON.parse(String(row.counts)));
     return {
+    ...(includeFocus?{focus:storyFocusEntries(row.preview?JSON.parse(row.preview):undefined)}:{}),
     id:String(row.id),createdAt:Number(row.created_at),title:String(row.title),hskTags,hskLevel:hskTags.at(-1)??null,difficulty:row.difficulty,hasCover:Boolean(row.has_cover),artStatus:row.art_status,chapter:Number(row.chapter),chapterTitle:String(row.chapter_title),
     paragraph:Number(row.paragraph),chapterCount:Number(row.chapter_count),finished:Boolean(row.finished),opened:row.opened!==null
     };

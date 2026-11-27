@@ -12,6 +12,10 @@ The collection of stories available to all learners. Each story has a common tex
 
 The characters a story is designed to practice. Every learner sees the same focus characters alongside their own current status for each one.
 
+**Strong focus**
+
+The highest story focus tier, covering the words and characters selected for deliberate practice. A character can be a strong focus target at any story difficulty and at any learner reading strength.
+
 **Reading type**
 
 The form of reading the learner chooses for a practice session. Book uses narrative prose, Article presents material such as notices, letters, recipes, and reports, and Dialogue presents a conversation as messages.

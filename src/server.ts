@@ -5,8 +5,7 @@ import { fileURLToPath,pathToFileURL } from 'node:url';
 import { ReadingStore,HttpError } from './store.ts';
 import { readerChapters } from './chapter-check.ts';
 import { strengthFor } from './strength.ts';
-import { storyFocus } from './story-scoring.ts';
-import type { PreviewItem } from './store.ts';
+import { storyFocusEntries } from './story-focus.ts';
 import { markAdvance } from './activity.ts';
 import { prepareMilestones } from './milestone-test.ts';
 import { generationWorker } from './generation-job.ts';
@@ -97,22 +96,7 @@ export async function createApp(pool: Pool) {
         const match = path.match(/^\/api\/stories\/([^/]+)(\/position)?$/);
         if (match && !match[2] && req.method==='GET') {
           const story=await store.story(match[1]);
-          const preview=story.preview;
-          const focus=new Map<string,PreviewItem>();
-          let ordered:PreviewItem[]=[];
-          if(url.searchParams.has('focus') && preview){
-            for(const item of [...preview.words??[],...preview.compound?[preview.compound]:[],...preview.characters??[],
-              ...preview.review??[],...preview.wordReview??[]]){
-              const entry=focus.get(item.text)??{text:item.text};
-              entry.pinyin||=item.pinyin;
-              entry.meaning||=item.meaning;
-              entry.example||=item.example;
-              focus.set(item.text,entry);
-            }
-            const tier=storyFocus(story);
-            const order={strong:0,medium:1,soft:2,other:3};
-            ordered=[...focus.values()].sort((a,b)=>order[tier(a.text)]-order[tier(b.text)]);
-          }
+          const ordered=url.searchParams.has('focus')?storyFocusEntries(story.preview):[];
           return json(200,{...(url.searchParams.has('focus')?{focus:await Promise.all(ordered.map(async item=>({...item,color:(await strengthFor(store.db,'word',item.text)).color})))}:{}),story:{...story,chapters:await readerChapters(store,story)},position:await store.position(match[1])});
         }
         if (match && match[2] && req.method==='POST') {

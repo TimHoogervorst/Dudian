@@ -23,21 +23,34 @@ main:has(.lib-controls){padding:clamp(14px,2vw,26px) clamp(16px,2.8vw,44px) 5rem
 .lib-legend button {border:1px solid transparent;background:transparent;color:var(--muted);border-radius:2rem;padding:.25rem .55rem}
 .lib-legend button:hover,.lib-legend button[aria-pressed=true] {background:#f5e9d7;color:var(--ink);border-color:var(--line)}
 .lib-entry .lib-status select {border:0;background:transparent;border-radius:1rem;padding:.3rem .15rem;color:var(--ink);font:inherit;cursor:pointer}
-.lib-status:before,.lib-tile:after {content:'';width:.59rem;height:.59rem;border-radius:100%;background:var(--strength)}
-.lib-grid {display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.lib-status:before {content:'';width:.59rem;height:.59rem;border-radius:100%;background:var(--strength)}
+.lib-grid {display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:10px}
 .lib-tile,.lib-pieces a {display:flex;align-items:center;justify-content:center;flex-direction:column;border:1px solid var(--line);border-radius:10px;background:#fffbf2}
-.lib-tile {position:relative;min-height:62px;padding:7px 9px;color:var(--ink);border-radius:7px;text-align:center;overflow-wrap:anywhere}
-.lib-grid .lib-tile strong {font-size:1.45rem;line-height:1.3}
+.lib-tile {position:relative;min-width:0;min-height:6.7rem;padding:1.25rem .35rem 1.6rem;color:var(--ink);border-radius:7px;text-align:center;overflow-wrap:anywhere}
+.tile-reading {display:grid;justify-items:center;width:100%;transform:translateY(-.4rem) scale(.8);transition:transform .18s ease}
+.lib-grid .tile-reading strong {font-size:1.9rem;line-height:1.2}
+.lib-tile .tile-reading span {font-size:1rem}
 .lib-tile:hover,.lib-pieces a:hover {background:#f5e6d1;text-decoration:none}
-.lib-tile:after {position:absolute;right:6px;top:5px;width:7px;height:7px}
+.lib-tile .tile-badge {position:absolute;top:3px;right:4px;max-width:calc(100% - 8px);display:grid;grid-template-columns:auto var(--badge-width,0fr);align-items:center;border-radius:1rem;background:var(--badge-bg,transparent);padding-right:var(--badge-padding,0);transition:grid-template-columns .18s ease,background .18s ease}
+.tile-badge::before {content:'';width:7px;height:7px;margin:3px;border-radius:50%;background:var(--strength)}
+.lib-tile .tile-status-label {min-width:0;overflow:hidden;white-space:nowrap;color:var(--ink);font:600 .67rem/1.4 var(--sans)}
+.tile-gloss {position:absolute;bottom:.3rem;inset-inline:.3rem;height:2.4em;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;color:var(--muted);font:.74rem/1.2 var(--sans);opacity:var(--preview-opacity,0);transition:opacity .16s ease}
+.lib-tile:focus-visible {--preview-opacity:1;--badge-width:1fr;--badge-bg:#f3e7d5;--badge-padding:4px;z-index:1}
+@media(hover:hover) and (pointer:fine){
+  .lib-tile {transition:transform .18s ease,box-shadow .18s ease}
+  .lib-tile:not(:hover):not(:focus-visible) .tile-reading {transform:translateY(.175rem)}
+  .lib-tile:is(:hover,:focus-visible) {--preview-opacity:1;--badge-width:1fr;--badge-bg:#f3e7d5;--badge-padding:4px;transform:translateY(-2px) scale(1.035);box-shadow:0 3px 10px #50321826;z-index:1}
+}
+@media(hover:none){.lib-tile {--preview-opacity:1;--badge-width:1fr;--badge-bg:#f3e7d5;--badge-padding:4px}}
+@media(prefers-reduced-motion:reduce){.lib-grid .lib-tile,.lib-tile .tile-badge,.tile-gloss,.tile-reading {transition:none}.lib-grid .lib-tile:is(:hover,:focus-visible){transform:none}}
 .lib-gold {--strength:#bd860f}
 .lib-tile.lib-gold {
   background:linear-gradient(125deg,#ffe9ab 0 17%,#fff6d6 17% 24%,#fae1a0 24% 82%,#f0cd7d 82% 100%);
   border-color:#c39a45;
   box-shadow:inset 0 -2px #d4ae60;
 }
-.lib-tile.lib-gold:after {
-  content:'☺';width:1rem;height:1rem;top:3px;right:4px;
+.lib-tile.lib-gold .tile-badge::before {
+  content:'☺';width:1rem;height:1rem;margin:0 2px;
   background:linear-gradient(145deg,#fff1ae 0 32%,#ffd467 32% 76%,#e3ac41 76% 100%);
   color:#694610;font:1rem/1 var(--sans);box-shadow:0 1px #b68434;
 }
@@ -75,4 +88,5 @@ main:has(.lib-controls){padding:clamp(14px,2vw,26px) clamp(16px,2.8vw,44px) 5rem
 .example-meaning,.lib-examples small {font:.9rem/1.4 var(--sans);color:var(--muted)}
 .lib-examples small {white-space:nowrap}
 @media(max-width:800px){.lib-grid{grid-template-columns:repeat(auto-fill,minmax(78px,1fr))}.lib-controls{grid-template-columns:1fr auto;gap:.6rem}.lib-tabs{justify-self:start}.lib-filters{grid-column:1/-1;grid-row:2}.lib-review{grid-column:2;grid-row:1}}
-@media(max-width:480px){.lib-controls .lib-review{padding:.45rem .6rem;font-size:.85rem}.lib-tabs a{padding:.3rem .45rem}.lib-legend{gap:8px}.lib-summary{gap:5px}.lib-status{font-size:.78rem}.lib-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:480px){.lib-controls .lib-review{padding:.45rem .6rem;font-size:.85rem}.lib-tabs a{padding:.3rem .45rem}.lib-legend{gap:8px}.lib-summary{gap:5px}.lib-status{font-size:.78rem}}
+@media(max-width:1020px){.lib-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,84px),1fr))}}

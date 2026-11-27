@@ -17,7 +17,7 @@ a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,[t
 .ui-icon{width:1.25em;height:1.25em;flex:none;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round}
 #nav a{display:inline-flex;align-items:center;gap:.5rem}
 @media(min-width:641px) and (max-width:980px){.mast-inner{flex-wrap:wrap;gap:.75rem 1.5rem;padding-inline:1rem}#nav a{padding-inline:.5rem}}
-@media(max-width:640px){#nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0}#nav a{justify-self:stretch}}
+@media(max-width:640px){#nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0}#nav a{justify-self:stretch}}
 main{max-width:1440px;margin:auto;padding:clamp(20px,3vw,50px) clamp(16px,5vw,72px) 70px}
 .page{animation:appear .22s ease-out}
 h1,h2,h3{color:var(--red);font-family:var(--serif);line-height:1.12;margin:.25em 0 .55em;letter-spacing:-.035em}
@@ -73,3 +73,47 @@ main:has(.reader-grid){padding-top:clamp(14px,1.4vw,22px)}
 .account-dialog form { gap:1rem }
 .account-dialog input { padding:.6rem; font:inherit }
 .account-dialog [role=alert]:empty { display:none }
+
+/* The account control stays in the masthead when navigation moves to the mobile dock. */
+.mast-inner { gap:clamp(.75rem,2vw,2rem) }
+.account-menu { position:relative; flex:none; z-index:9; color:var(--red) }
+.account-menu summary { width:44px; height:44px; display:grid; place-items:center; cursor:pointer; list-style:none; border:1px solid var(--line); border-radius:50%; background:#fff9ef }
+.account-menu summary::-webkit-details-marker { display:none }
+.account-menu summary:hover,.account-menu[open] summary { background:var(--soft); border-color:var(--red) }
+.account-menu summary:focus-visible { outline:3px solid #af6c29; outline-offset:3px }
+.account-panel { position:absolute; right:0; top:calc(100% + .55rem); width:min(15rem,calc(100vw - 2rem)); padding:.4rem; border:1px solid var(--line); border-radius:.85rem; background:#fffaf0; box-shadow:0 .6rem 1.8rem #492a161c }
+.account-identity { padding:.65rem .7rem .8rem; margin-bottom:.3rem; border-bottom:1px solid var(--line); overflow-wrap:anywhere }
+.account-identity small,.account-identity strong { display:block }
+.account-identity small { font:.8rem var(--sans); color:var(--muted) }
+.account-identity strong { margin-top:.2rem; font-size:1.35rem; color:var(--ink) }
+.account-panel a,.account-panel button { display:flex; align-items:center; gap:.7rem; width:100%; min-height:44px; padding:.6rem .7rem; border:0; border-radius:.45rem; background:transparent; font:600 .95rem var(--sans); color:var(--ink); text-decoration:none }
+.account-panel :is(a,button):hover { background:var(--paper); color:var(--red) }
+@media(min-width:641px){#nav{margin-left:auto}}
+@media(max-width:640px){.mast-inner{justify-content:space-between}}
+
+.page-settings { width:min(100%,64rem); margin:auto }
+.page-settings>h1 { margin:0 0 .6em }
+.settings-group { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2.4fr); gap:1rem 2rem; align-items:start; padding:1.5rem 0; border-top:1px solid var(--line) }
+.settings-group>h2 { margin:.45rem 0; font-size:clamp(1.35rem,2.1vw,1.8rem) }
+.settings-card { grid-column:2; padding:clamp(1rem,2.5vw,1.6rem); background:#fff9ef; border:1px solid var(--line); border-radius:.8rem; font:1rem/1.5 var(--sans); min-width:0; overflow-wrap:anywhere }
+.settings-card:empty { display:none }
+.page-settings .settings-card .story-settings { display:grid; gap:.85rem; max-width:none; margin:0; padding:0; background:none; border:0 }
+.settings-card h3 { margin:0; font-size:1.45rem; color:var(--ink) }
+.settings-card section,.settings-card form { display:grid; gap:.85rem }
+.settings-card :is(button,.connect) { justify-self:start }
+.settings-card p { margin:0; color:var(--muted) }
+.settings-card p:empty { display:none }
+.settings-card :is(select,input) { max-width:100% }
+.page-settings .settings-card input[type=checkbox] { width:1.1rem; height:1.1rem; accent-color:var(--red); flex:none }
+.page-settings .settings-card label:has(input[type=checkbox]) { display:flex; align-items:center; justify-content:flex-start; gap:.65rem }
+.page-settings .settings-card input[type=password] { width:min(100%,16rem) }
+.settings-card .connect { text-decoration:underline; text-underline-offset:.2em }
+.page-settings .settings-card [hidden] { display:none !important }
+@media(max-width:720px){
+  .settings-group { grid-template-columns:minmax(0,1fr); gap:.8rem }
+  .settings-card { grid-column:1 }
+}
+@media(max-width:480px){
+  .page-settings .story-settings label:has(select),.page-settings .story-settings label:has(input[type=password]) { display:grid; gap:.3rem }
+  .settings-card select { width:100% }
+}

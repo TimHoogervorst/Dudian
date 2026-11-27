@@ -13,7 +13,7 @@ export default async function historyRoutes({req,url,store,json}:Context) {
     return true;
   }
   if(req.method==='GET'&&url.pathname==='/api/history') {
-    json(200,await history(store));
+    json(200,await history(store,url.searchParams.has('focus')));
     return true;
   }
   const match=url.pathname.match(/^\/api\/stories\/([^/]+)\/(opened|hide)$/);
