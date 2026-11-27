@@ -12,7 +12,7 @@ async function renderList(root, kind, level, page, size, query, filter,signal) {
   const browse=(kind,level,page,size,term)=>libraryUrl(kind,level,page,size,term,filter);
   const controls = el('div',null,'lib-controls');
   const tabs = el('nav',null,'lib-tabs');
-  tabs.setAttribute('aria-label','Library collection');
+  tabs.setAttribute('aria-label','Dictionary collection');
   for (const type of ['character','word']) {
     const tab = link(labelFor(type),browse(type,level,1,size,query));
     const symbol=el('span',type==='word'?'词':'字','lib-tab-symbol');
@@ -63,7 +63,7 @@ async function renderList(root, kind, level, page, size, query, filter,signal) {
     return tile;
   }
   const pages = el('nav',null,'lib-pages');
-  pages.setAttribute('aria-label','Library pages');
+  pages.setAttribute('aria-label','Dictionary pages');
   const sizeLabel=el('label','Per page ');
   const sizeSelect=el('select');
   for (const n of sizes) sizeSelect.append(new Option(String(n),String(n),false,n===size));

@@ -173,7 +173,7 @@ export function drawPractice(root,session,summary){
   root.replaceChildren();
   if(!session.exercise){summary(root,session);return;}
   const header=el('header',null,'card-heading');
-  header.append(link('← Library','#/library','text-link'));
+  header.append(link('← Dictionary','#/library','text-link'));
   const card=el('section',null,'recall-card practice-exercise');
   const format=formats[session.exercise.type];
   const counter=el('p','Exercise '+(session.index+1)+' of '+session.total,'overline');

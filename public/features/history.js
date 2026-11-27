@@ -15,22 +15,38 @@ export function setup(ui) {
     symbol.setAttribute('aria-hidden','true');badge.prepend(symbol);
     return badge;
   }
+  function cardArtwork(story,featured=false){
+    const frame=el('span',null,'card-artwork');
+    const artClass=featured?'hero-art':'shelf-art';
+    let art;
+    if(story?.hasCover)art=coverImage(story,artClass);
+    else if(story?.id==='tea-shop')art=el('span',null,'tea-art '+artClass);
+    else{
+      art=el('img',null,artClass);
+      art.src='/baobao.png';art.alt='';
+    }
+    art.setAttribute('aria-hidden','true');
+    frame.append(art);
+    if(story)frame.append(statusBadge(story));
+    return frame;
+  }
   function listing(stories,manage=false) {
     const list=el('ul',null,'story-shelf');
     for(const story of stories) {
       const item=el('li');
       item.dataset.storyId=story.id;
       const href=story.hasCover?'#/introduction/'+encodeURIComponent(story.id):read(story);
-      const art=story.hasCover?coverImage(story,'shelf-art'):
-        story.id==='tea-shop'?el('span',null,'tea-art shelf-art'):null;
+      const cover=cardArtwork(story);
       list.append(item);
       if(manage){
         item.className='managed-story';
-        const cover=art??el('img',null,'shelf-art');
-        if(!art)cover.src='/baobao.png';
-        cover.setAttribute('aria-hidden','true');
-        const title=el('h2');title.append(link(story.title,href,'gallery-story-link'));
-        item.append(cover,title,statusBadge(story),metadata(story));
+        const title=el('h2');
+        const storyLink=link('',href,'gallery-story-link');
+        storyLink.append(el('span',story.title,'shelf-title'));
+        title.append(storyLink);
+        const copy=el('div',null,'shelf-copy');
+        copy.append(title,metadata(story));
+        item.append(cover,copy);
         const menu=el('details',null,'story-menu');
         menu.name='story-actions';
         const toggle=el('summary','•••');
@@ -51,11 +67,9 @@ export function setup(ui) {
         menu.append(toggle,remove);item.append(menu);
       }else{
         const a=link('',href,'shelf-item');
-        if(art)a.append(art);
-        else {const image=el('img',null,'shelf-art');image.src='/baobao.png';image.alt='';a.append(image);}
         const copy=el('span',null,'shelf-copy');
-        copy.append(el('strong',story.title),metadata(story),statusBadge(story));
-        a.append(copy);
+        copy.append(el('strong',story.title,'shelf-title'),metadata(story));
+        a.append(cover,copy);
         item.append(a);
       }
     }
@@ -85,7 +99,7 @@ export function setup(ui) {
             }
             const failed=job.stage==='failed',copy=card.lastChild;
             copy.replaceChildren(el('strong',failed?'Generation stopped':'Still generating'),metadata(job));
-            if(failed)copy.append(el('span',[labels[job.failedStage],job.error].filter(Boolean).join(' · ')),link('Try again in Practice','#/practice','text-link'),link('Open Settings','#/settings','text-link'));
+            if(failed)copy.append(el('span',[labels[job.failedStage],job.error].filter(Boolean).join(' · ')),link('Try again in Generate','#/practice','text-link'),link('Open Settings','#/settings','text-link'));
             else{
               const progress=el('progress');progress.max=steps.length;
               progress.value=steps.indexOf(job.stage==='revising'?'checking':job.stage);
@@ -112,18 +126,15 @@ export function setup(ui) {
     const featured=current;
     const overview=el('div',null,'dashboard-overview');
     const hero=el('section',null,'home-hero');
-    if(featured?.id==='tea-shop'){
-      const art=el('div',null,'tea-art');art.setAttribute('role','img');
-      art.setAttribute('aria-label','A rainy afternoon at the tea shop');hero.append(art);
-    }
+    hero.append(cardArtwork(featured,true));
     const copy=el('div',null,'hero-copy');
-    if(featured?.hasCover)hero.append(coverImage(featured));
-    else if(featured?.id!=='tea-shop'){const art=el('img',null,'story-illustration');art.src='/baobao.png';art.alt='';hero.append(art);}
     if(featured) {
       copy.append(el('p','Chapter '+(featured.chapter+1)+' of '+featured.chapterCount,'overline'));
       const titles=el('div');
-      titles.append(el('h2',featured.title),el('p',featured.chapterTitle,'hero-chapter'));
-      copy.append(titles,metadata(featured),statusBadge(featured),link('Continue reading →',read(featured),'button'));
+      titles.append(el('h2',featured.title),metadata(featured),el('p',featured.chapterTitle,'hero-chapter'));
+      const actions=el('div',null,'hero-actions');
+      actions.append(link('Continue reading →',read(featured),'button'));
+      copy.append(titles,actions);
     }else{
       copy.append(el('h2','Your next story'),link('Create a story →','#/practice','button'));
     }

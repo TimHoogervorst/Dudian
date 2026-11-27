@@ -65,7 +65,7 @@ function drawSummary(root,session){
     };
     actions.append(more);
   }
-  actions.append(link('Back to Library',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'button'));
+  actions.append(link('Back to Dictionary',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'button'));
   page.append(actions);root.append(page);
 }
 
@@ -76,7 +76,7 @@ function draw(root,session) {
     return;
   }
   const header = el('header',null,'card-heading');
-  header.append(link('← Library',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'text-link'),el('h1','Flashcards'));
+  header.append(link('← Dictionary',session.kind==='mixed'?'#/library':'#/library/'+session.kind,'text-link'),el('h1','Flashcards'));
   root.append(header);
   const card = el('section',null,'recall-card');
   const counter = el('p',(session.card.kind==='character'?'Characters':'Words')+' · '+(session.index+1)+' of '+session.total,'overline');

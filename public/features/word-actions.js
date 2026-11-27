@@ -49,7 +49,7 @@ export function setup(ui) {
       mark.disabled=isMarked;mark.onclick=()=>{mark.disabled=true;write(word,'difficulty').catch(()=>{mark.disabled=false;});};
       const entryKind=Array.from(meaning.text).length===1?'character':'word';
       const entry=link('','#/library/'+entryKind+'/entry/'+encodeURIComponent(meaning.text)+'/'+meaning.sense);
-      entry.title='View '+entryKind+' in Library';
+      entry.title='View '+entryKind+' in Dictionary';
       entry.setAttribute('aria-label',entry.title);
       entry.append(icon('books'));
       const actions=el('div',null,'dictionary-actions');

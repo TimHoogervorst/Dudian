@@ -81,7 +81,7 @@ export function showCover(context,story,article) {
 export function setup(ui){
   ui.route('cast',({root})=>{
     const img=el('img',null,'cast-portrait');img.src=portrait;img.alt='包包 with a green crossbody satchel';
-    root.append(link('← Library','#/library','text-link'),el('h1','Meet the cast'),img,el('h2','包包 · Bāobāo'),
+    root.append(link('← Dictionary','#/library','text-link'),el('h1','Meet the cast'),img,el('h2','包包 · Bāobāo'),
       el('p','Our little steamed-bun friend carries a green satchel and finds adventures in everyday life.'));
   });
   ui.on('settings',async({root,signal})=>{

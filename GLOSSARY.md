@@ -4,6 +4,10 @@ The learner reads Chinese stories and uses encounters with unfamiliar language t
 
 ## Language
 
+**Story catalog**
+
+The collection of stories available to all learners. Each story has a common text and character focus, and each learner has their own reading history with it.
+
 **Reading type**
 
 The form of reading the learner chooses for a practice session. Book uses narrative prose, Article presents material such as notices, letters, recipes, and reports, and Dialogue presents a conversation as messages.

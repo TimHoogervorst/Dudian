@@ -4,8 +4,15 @@ import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
 document.querySelector('.skip').onclick=event=>{event.preventDefault();root.focus();};
-for(const [name,mark] of [['Practice','book'],['Library','books'],['Progression','flag'],['Settings','settings']]) {
-  const a=link(name,'#/'+name.toLowerCase());
+const tabs=[
+  ['practice','Generate','pencil'],
+  ['stories','Library','book'],
+  ['library','Dictionary','dictionary'],
+  ['progression','Progression','flag'],
+  ['settings','Settings','settings'],
+];
+for(const [route,name,mark] of tabs) {
+  const a=link(name,'#/'+route);
   a.prepend(icon(mark));nav.append(a);
 }
 const pages={read:reader,settings:({root})=>root.append(el('h1','Settings'))};
@@ -16,7 +23,8 @@ async function render() {
   const name=route==='reading'?'practice':route;
   const page=el('div',null,'page page-'+(Object.hasOwn(pages,name)||ui.routes.has(name)?name:'missing'));
   root.replaceChildren(page);ui.notice('');
-  document.title=(name==='home'?'Reading desk':name.charAt(0).toUpperCase()+name.slice(1))+' · Dudian';
+  const tab=tabs.find(([route])=>route===name);
+  document.title=(tab?.[1]??(name==='home'?'Reading desk':name.charAt(0).toUpperCase()+name.slice(1)))+' · Dudian';
   for(const a of nav.children) {
     if(a.hash==='#/'+name)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
   }
