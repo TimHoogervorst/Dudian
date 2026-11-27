@@ -32,4 +32,8 @@ Tap a word like 苹果 to see its meaning, or reveal the English translation ben
 
 ![The Shopping Trip chapter with pinyin above the text and the dictionary showing 苹果 (apple)](docs/reader.png)
 
-[MIT license](LICENSE) · [Dictionary and vocabulary credits](data/NOTICE.md)
+## License
+
+Copyright (c) Street Talk contributors. Dudian’s original application code is licensed under the [GNU Affero General Public License, version 3 only](LICENSE) (`AGPL-3.0-only`).
+
+Bundled dictionary and curriculum data carry their own licenses. The application license excludes the supplied design references and illustrations. [Dictionary and vocabulary credits](data/NOTICE.md)
