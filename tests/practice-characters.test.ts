@@ -1,15 +1,16 @@
+import { testStore } from './postgres-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ReadingStore} from '../src/store.ts';
-import {practicePreview,confirmedPlan} from '../src/practice-preview.ts';
-import {setStrength,strengthFor} from '../src/strength.ts';
-import {seeItem} from '../src/encounters.ts';
-import {generateReading} from '../src/story-generation.ts';
-import {planWordReviews} from '../src/word-review.ts';
-import {resolveStorySenses} from '../src/story-senses.ts';
+import { ReadingStore } from '../src/store.ts';
+import { practicePreview,confirmedPlan } from '../src/practice-preview.ts';
+import { setStrength,strengthFor } from '../src/strength.ts';
+import { seeItem } from '../src/encounters.ts';
+import { generateReading } from '../src/story-generation.ts';
+import { planWordReviews } from '../src/word-review.ts';
+import { resolveStorySenses } from '../src/story-senses.ts';
 
-function preview(store:ReadingStore){
-  const draft=practicePreview(store,{difficulty:'easy',chapterCount:1,type:'article'});
+async function preview(store:ReadingStore){
+  const draft=await practicePreview(store,{difficulty:'easy',chapterCount:1,type:'article'});
   return confirmedPlan(store,draft.id,'easy',1,'open');
 }
 
@@ -21,8 +22,8 @@ test('also matches one gloss of 也 locally, including the teaser',async()=>{
 });
 
 test('ambiguous occurrences are batched and only unresolved selections are retried',async t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
-  const base=preview(store);
+  const store=await testStore();
+  const base=await preview(store);
   const plan={...base,background:[...'我也去你他'],characters:{...base.characters!,available:'我也去你他',beginner:false},newCharacters:[],newWords:[],reviewWords:[]};
   const draft={title:'Going',chapters:[{title:'Going',sections:['notice'],paragraphs:[[['我:1','也','去:1','。'],['你:1','也:99','去:1','。']]],
     translations:['I am going too. Even you are going.']}],teaser:['我:1','去:1','。']};
@@ -50,15 +51,15 @@ test('ambiguous occurrences are batched and only unresolved selections are retri
   assert.notEqual(words[1].sense,words[5].sense);
 });
 
-test('the first score ends starter selection and encountered starter characters remain available',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
-  const first=preview(store);
+test('the first score ends starter selection and encountered starter characters remain available',async t=>{
+  const store=await testStore();
+  const first=await preview(store);
   assert.equal(first.characters?.beginner,true);
   assert.deepEqual(new Set(first.characters.available),new Set('我你是好吗'));
-  assert.deepEqual(planWordReviews(store,first),[]);
-  seeItem(store.db,'你好',Date.now());
-  setStrength(store.db,'character','我','yellow');
-  const next=preview(store);
+  assert.deepEqual(await planWordReviews(store,first),[]);
+  await seeItem(store.db,'你好',Date.now());
+  await setStrength(store.db,'character','我','yellow');
+  const next=await preview(store);
   assert.equal(next.characters?.beginner,false);
   assert(next.characters.available.includes('好'));
   assert(!next.characters.available.includes('吗'));
@@ -66,10 +67,10 @@ test('the first score ends starter selection and encountered starter characters 
 });
 
 test('a passed band, partial familiarity and a distinct-character budget govern sentence repairs',async t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
-  store.db.exec('INSERT INTO milestone_passes VALUES(1)');
-  setStrength(store.db,'character','快','green');
-  const plan={...preview(store),newWords:['学'],newCharacters:[],reviewWords:[],compound:undefined,ceiling:1};
+  const store=await testStore();
+  await store.db.prepare('INSERT INTO milestone_passes(level) VALUES(1)').run();
+  await setStrength(store.db,'character','快','green');
+  const plan={...await preview(store),newWords:['学'],newCharacters:[],reviewWords:[],compound:undefined,ceiling:1};
   assert.equal(plan.characters?.passed,1);
   assert.equal(plan.characters.familiar,'快');
   const first=['你好','说:2','学:1','快:1','。'];
@@ -101,5 +102,5 @@ test('a passed band, partial familiarity and a distinct-character budget govern 
   assert.deepEqual(story.chapters[0].paragraphs[0].map(t=>t.text),['你好','说','学','快','。']);
   assert.deepEqual(story.chapters[0].translations,['Hello.','Slowly, slowly.']);
   assert.deepEqual(story.preview.characters.map(item=>item.text),['慢']);
-  assert.equal(strengthFor(store.db,'character','慢').score,null);
+  assert.equal((await strengthFor(store.db,'character','慢')).score,null);
 });

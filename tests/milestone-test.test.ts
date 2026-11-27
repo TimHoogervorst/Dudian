@@ -1,12 +1,12 @@
+import { testStore } from './postgres-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ReadingStore} from '../src/store.ts';
-import {catalog} from '../src/catalog.ts';
-import {seeItem} from '../src/encounters.ts';
-import {setStrength} from '../src/strength.ts';
-import {milestoneProgress} from '../src/milestone-progress.ts';
-import {discardTest,generateTest,prepareMilestones,preparation,saveDraft,startTest,submitTest,testView} from '../src/milestone-test.ts';
-import {createApp} from '../src/server.ts';
+import { catalog } from '../src/catalog.ts';
+import { seeItem } from '../src/encounters.ts';
+import { setStrength } from '../src/strength.ts';
+import { milestoneProgress } from '../src/milestone-progress.ts';
+import { discardTest,generateTest,prepareMilestones,preparation,saveDraft,startTest,submitTest,testView } from '../src/milestone-test.ts';
+import { createApp } from '../src/server.ts';
 
 async function passages(prompt:string){
   if(prompt.startsWith('Write a chapter comprehension check')){
@@ -30,15 +30,15 @@ async function passages(prompt:string){
 }
 
 test('a reached score unlocks preparation without character encounters and reports completed passages',async t=>{
-  const {db}=new ReadingStore();t.after(()=>db.close());
+  const {db}=await testStore();
   const chars=catalog.libraryItems('character',1);
   for(const kind of ['character','word'] as const)
-    for(const {text} of catalog.libraryItems(kind,1))setStrength(db,kind,text,'green');
-  setStrength(db,'character',chars[0].text,'gray');
-  const progress=milestoneProgress(db);
+    for(const {text} of catalog.libraryItems(kind,1))await setStrength(db,kind,text,'green');
+  await setStrength(db,'character',chars[0].text,'gray');
+  const progress=await milestoneProgress(db);
   assert.equal(progress.milestone,1);
   assert(progress.level<1);
-  assert.equal(db.prepare('SELECT count(*) AS n FROM milestone_characters').get()!.n,0);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM milestone_characters').get())!.n,0);
   await assert.rejects(generateTest(db,2,passages),/requirements/);
   let resume!:()=>void;
   const paused=new Promise<void>(resolve=>{resume=resolve;});
@@ -61,27 +61,27 @@ test('a reached score unlocks preparation without character encounters and repor
     return draft;
   });
   await second;
-  assert.equal(preparation(db,1).completed,1);
-  assert.equal(preparation(db,1).total,5);
+  assert.equal((await preparation(db,1)).completed,1);
+  assert.equal((await preparation(db,1)).total,5);
   resume();
   const id=await job;
   assert(repairedName,'An out-of-level speaker name must be revised before the test is ready.');
-  assert.equal(preparation(db,1).attempt?.id,id);
+  assert.equal((await preparation(db,1)).attempt?.id,id);
   assert.equal(progress.passed,0);
 });
 
 test('a milestone attempt resumes, grades matching pairs, retries and passes without learning evidence',async t=>{
-  const {db}=new ReadingStore();t.after(()=>db.close());
-  db.exec('UPDATE milestone_progress SET reached=2');
-  for(const level of [1,2])for(const {text} of catalog.libraryItems('character',level))seeItem(db,text,1);
-  const evidence=()=>['reading_strength','score_changes','item_encounters','milestone_characters'].map(table=>
-    db.prepare('SELECT * FROM '+table+' ORDER BY rowid').all());
-  milestoneProgress(db);
-  const before=evidence();
+  const {db}=await testStore();
+  await db.prepare('UPDATE milestone_progress SET reached=2').run();
+  for(const level of [1,2])for(const {text} of catalog.libraryItems('character',level))await seeItem(db,text,1);
+  const evidence=async ()=>await Promise.all(['reading_strength','score_changes','item_encounters','milestone_characters'].map(async table=>
+    await db.prepare('SELECT * FROM '+table+' AS evidence ORDER BY to_jsonb(evidence)::text').all()));
+  await milestoneProgress(db);
+  const before=await evidence();
   await assert.rejects(generateTest(db,1,async()=>'[]'),/exactly 1 chapters/);
   const [id,duplicate]=await Promise.all([generateTest(db,1,passages),generateTest(db,1,passages)]);
   assert.equal(id,duplicate);
-  const intro=testView(db,id);
+  const intro=await testView(db,id);
   assert.equal(intro.status,'ready');
   assert.equal(intro.sections.length,10);
   assert.deepEqual(intro.sections.filter(s=>s.kind!=='Practice').map(s=>s.kind),['Book','Dialogue','Article','Book','Dialogue']);
@@ -98,19 +98,19 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
     if(section.kind==='Dialogue')assert.equal(section.names?.length,2);
     if(section.kind==='Article')assert.deepEqual(section.sections,['greeting','body','body','body','signature']);
   }
-  assert.equal(db.prepare('SELECT count(*) AS n FROM stories').get()!.n,1);
+  assert.equal((await db.prepare('SELECT count(*) AS n FROM stories').get())!.n,1);
 
-  function run(id:string,readingMistakes:number,practiceMistakes:number){
-    const sections=JSON.parse(String(db.prepare('SELECT sections FROM milestone_tests WHERE id=?').get(id)!.sections));
-    const view=startTest(db,id);
+  async function run(id:string,readingMistakes:number,practiceMistakes:number){
+    const sections=JSON.parse(String((await db.prepare('SELECT sections FROM milestone_tests WHERE id=$1').get(id))!.sections));
+    const view=await startTest(db,id);
     assert.equal(view.position,-1);
-    saveDraft(db,id,0,0,[0]);
-    saveDraft(db,id,-1);
-    assert.equal(testView(db,id).position,-1);
-    assert.deepEqual(testView(db,id).answers[0].answers,[0]);
+    await saveDraft(db,id,0,0,[0]);
+    await saveDraft(db,id,-1);
+    assert.equal((await testView(db,id)).position,-1);
+    assert.deepEqual((await testView(db,id)).answers[0].answers,[0]);
     for(let section=sections.length-1;section>=0;section--){
       const s=sections[section];
-      view.sections[section].tasks.forEach((q,task)=>{
+      for(const task of view.sections[section].tasks.keys()){
         const e=s.exercises[task];
         const answers=e?e.targets.map((item:{meaning:string})=>e.options.indexOf(item.meaning)):[s.questions[task].correct];
         if(!e&&readingMistakes>0){
@@ -123,64 +123,64 @@ test('a milestone attempt resumes, grades matching pairs, retries and passes wit
           answers[0]=(answers[0]+1)%e.options.length;
           practiceMistakes--;
         }
-        saveDraft(db,id,section,task,answers);
-      });
+        await saveDraft(db,id,section,task,answers);
+      }
     }
-    assert.equal(testView(db,id).position,0);
-    assert(!('mistakes' in testView(db,id)));
-    const result=submitTest(db,id);
-    assert.deepEqual(submitTest(db,id),result);
+    assert.equal((await testView(db,id)).position,0);
+    assert(!('mistakes' in await testView(db,id)));
+    const result=await submitTest(db,id);
+    assert.deepEqual(await submitTest(db,id),result);
     return result;
   }
-  const failed=run(id,2,4);
+  const failed=await run(id,2,4);
   assert.equal(failed.status,'failed');
   assert.equal(failed.reading.mistakes,2);
   assert.equal(failed.practice.mistakes,4);
-  const readingFailure=run(await generateTest(db,1,passages),4,2);
+  const readingFailure=await run(await generateTest(db,1,passages),4,2);
   assert.equal(readingFailure.status,'failed');
   assert.equal(readingFailure.reading.mistakes,4);
   assert.equal(readingFailure.practice.mistakes,2);
   const retry=await generateTest(db,1,passages);
   assert.notEqual(id,retry);
-  const passed=run(retry,3,3);
+  const passed=await run(retry,3,3);
   assert.equal(passed.status,'passed');
   assert.equal(passed.mistakes,6);
   assert.equal(passed.reading.mistakes,3);
   assert.equal(passed.practice.mistakes,3);
-  assert.equal(milestoneProgress(db).milestone,2);
-  discardTest(db,retry);
-  assert.equal(milestoneProgress(db).passed,1);
-  prepareMilestones(db,passages);
+  assert.equal((await milestoneProgress(db)).milestone,2);
+  await discardTest(db,retry);
+  assert.equal((await milestoneProgress(db)).passed,1);
+  await prepareMilestones(db,passages);
   const [retake,nextLevel]=await Promise.all([generateTest(db,1,passages),generateTest(db,2,passages)]);
   assert.notEqual(retake,nextLevel);
-  assert.equal(preparation(db,2).attempt?.id,nextLevel);
-  assert.equal(startTest(db,retake).practiceRetake,true);
-  saveDraft(db,retake,0,0,[1]);
-  saveDraft(db,retake,0,0,[0]);
-  assert.deepEqual(testView(db,retake).answers[0].answers,[0]);
-  const blank=submitTest(db,retake);
+  assert.equal((await preparation(db,2)).attempt?.id,nextLevel);
+  assert.equal((await startTest(db,retake)).practiceRetake,true);
+  await saveDraft(db,retake,0,0,[1]);
+  await saveDraft(db,retake,0,0,[0]);
+  assert.deepEqual((await testView(db,retake)).answers[0].answers,[0]);
+  const blank=await submitTest(db,retake);
   assert.equal(blank.status,'failed');
   assert.equal(blank.mistakes,0);
   assert(blank.unanswered>0);
-  assert.equal(milestoneProgress(db).passed,1);
-  assert.deepEqual(evidence(),before);
+  assert.equal((await milestoneProgress(db)).passed,1);
+  assert.deepEqual(await evidence(),before);
 });
 
 test('dashboard and Progression share a capped score and attempt while formats follow earned progress',async t=>{
-  const store=new ReadingStore();
+  const store=await testStore();
   const {db}=store;
   for(const level of [1,2])for(const kind of ['character','word'] as const){
     for(const {text} of catalog.libraryItems(kind,level)){
-      setStrength(db,kind,text,'green');
-      seeItem(db,text,1);
+      await setStrength(db,kind,text,'green');
+      await seeItem(db,text,1);
     }
   }
   const id=await generateTest(db,1,passages);
-  const server=await createApp(store);
+  const server=await createApp(store.db.pool);
   await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
-  t.after(async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));db.close();});
+  t.after(async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));});
   const base='http://127.0.0.1:'+server.address()!.port+'/api/';
-  const get=async(path:string)=>(await fetch(base+path)).json();
+  const get=async(path:string)=>(await store.fetch(base+path)).json();
   const home=await get('reading-progress'),progression=await get('progression');
   assert.equal(home.level,1);
   assert.equal(home.attempt.id,id);
@@ -189,7 +189,7 @@ test('dashboard and Progression share a capped score and attempt while formats f
   assert(progression.groups.flatMap(group=>group.cards).some(card=>card.threshold===2&&card.unlocked));
   const path='milestone-tests/'+id;
   assert.equal((await get(path)).status,'ready');
-  await fetch(base+path+'/start',{method:'POST'});
+  await store.fetch(base+path+'/start',{method:'POST'});
   const active=await get(path);
   assert.equal(active.status,'active');
   assert.equal(active.sections[0].tasks[0].correct,undefined);

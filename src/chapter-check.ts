@@ -1,20 +1,20 @@
-import {strengthFor} from './strength.ts';
-import {catalog} from './catalog.ts';
-import {dictionaryTokens} from './cover-text.ts';
-import {ReadingStore,HttpError,type Story} from './store.ts';
-import {completionFor,finishChapter,ensureCompletions} from './completion.ts';
-import {recordAnswer} from './story-scoring.ts';
-import {sentenceText} from './word-actions.ts';
-import {questionWords,readingItems,seeItem} from './encounters.ts';
+import { strength,recordedStrengths } from './strength.ts';
+import { catalog } from './catalog.ts';
+import { dictionaryTokens } from './cover-text.ts';
+import { ReadingStore,HttpError,type Story } from './store.ts';
+import { completionFor,finishChapter } from './completion.ts';
+import { recordAnswer } from './story-scoring.ts';
+import { sentenceText } from './word-actions.ts';
+import { questionWords,readingItems,seeItem } from './encounters.ts';
 
 const libraryForms=new Set([...catalog.list('character'),...catalog.list('word')].map(item=>item.text));
 
-export function readerChapters(store:ReadingStore,story:Story){
-  ensureCompletions(store.db);
-  const answered=new Set(store.db.prepare('SELECT chapter,question FROM quiz_attempts WHERE story_id=? AND choice IS NOT NULL')
-    .all(story.id).map(row=>row.chapter+'/'+row.question));
-  const colors=new Map<string,string>();
-  return story.chapters.map(({questions,...chapter},index)=>{
+export async function readerChapters(store:ReadingStore,story:Story){
+
+  const answered=new Set((await store.db.prepare('SELECT chapter,question FROM quiz_attempts WHERE story_id=$1 AND choice IS NOT NULL')
+    .all(story.id)).map(row=>row.chapter+'/'+row.question));
+  const scores=new Map((await recordedStrengths(store.db)).map(item=>[item.text,item.score]));
+  return story.chapters.map( ({questions,...chapter},index)=>{
     const readingDone=!!questions?.length && questions.every((q,i)=>q.reviewRound || answered.has(index+'/'+i));
     const rounds=[...new Set(questions?.flatMap(q=>q.reviewRound?[q.reviewRound]:[]))];
     let available=readingDone;
@@ -28,8 +28,7 @@ export function readerChapters(store:ReadingStore,story:Story){
     const unseenItems:string[]=[],strugglingCharacters:string[]=[];
     for(const text of forms){
       if(!libraryForms.has(text))continue;
-      if(!colors.has(text))colors.set(text,strengthFor(store.db,'word',text).color);
-      const color=colors.get(text);
+      const color=strength(scores.get(text)??null).color;
       if(color==='gray')unseenItems.push(text);
       else if(color==='red'&&Array.from(text).length===1)strugglingCharacters.push(text);
     }
@@ -37,11 +36,11 @@ export function readerChapters(store:ReadingStore,story:Story){
   });
 }
 
-export function chapterCheck(store:ReadingStore,id:string,index:number) {
-  const story=store.story(id),chapter=story.chapters[index];
+export async function chapterCheck(store:ReadingStore,id:string,index:number) {
+  const story=await store.story(id),chapter=story.chapters[index];
   if(!chapter?.questions)throw new HttpError(404,'This chapter has no comprehension check.');
-  const completion=completionFor(store,id);
-  const rows=store.db.prepare('SELECT * FROM quiz_attempts WHERE story_id=? AND chapter=?').all(id,index);
+  const completion=await completionFor(store,id);
+  const rows=await store.db.prepare('SELECT * FROM quiz_attempts WHERE story_id=$1 AND chapter=$2').all(id,index);
   const questions=chapter.questions.map((q,i)=>{
     const row=rows.find(r=>r.question===i);
     const answered=typeof row?.choice==='number';
@@ -60,39 +59,38 @@ export function chapterCheck(store:ReadingStore,id:string,index:number) {
   return {title:chapter.title,questions,completion,next:story.chapters.findIndex((_,i)=>!completion.chapters.includes(i))};
 }
 
-export function updateCheck(store:ReadingStore,id:string,index:number,input:any) {
-  const story=store.story(id),chapter=story.chapters[index];
+export async function updateCheck(store:ReadingStore,id:string,index:number,input:any) {
+  const story=await store.story(id),chapter=story.chapters[index];
   const question=chapter?.questions?.[input?.question];
   if(!Number.isInteger(input?.question)||!question)throw new HttpError(400,'Choose a chapter question.');
   if(question.reviewRound && input.action==='english')throw new HttpError(400,'Choose the English meaning.');
   if(input.action!=='english' && (input.action!=='answer'||!Number.isInteger(input.choice)||!question.choices[input.choice]))
     throw new HttpError(400,'Choose a valid answer.');
   const {db}=store;
-  completionFor(store,id);
+  await completionFor(store,id);
   const key=[id,index,input.question];
-  db.exec('BEGIN IMMEDIATE');
-  try {
+  await db.transaction(async () => {
     if(question.reviewRound){
       const first=chapter.questions!.findIndex(q=>q.reviewRound===question.reviewRound);
-      const prior=db.prepare('SELECT count(choice) AS n FROM quiz_attempts WHERE story_id=? AND chapter=? AND question<?').get(id,index,first);
+      const prior=await db.prepare('SELECT count(choice) AS n FROM quiz_attempts WHERE story_id=$1 AND chapter=$2 AND question<$3').get(id,index,first);
       if(Number(prior?.n)!==first)throw new HttpError(409,'Finish the preceding cards first.');
     }
-    db.prepare('INSERT OR IGNORE INTO quiz_attempts(story_id,chapter,question) VALUES(?,?,?)').run(...key);
+    await db.prepare('INSERT INTO quiz_attempts(story_id,chapter,question) VALUES($1,$2,$3) ON CONFLICT DO NOTHING').run(...key);
     if(input.action==='english'){
-      db.prepare('UPDATE quiz_attempts SET english=1 WHERE story_id=? AND chapter=? AND question=? AND choice IS NULL').run(...key);
+      await db.prepare('UPDATE quiz_attempts SET english=1 WHERE story_id=$1 AND chapter=$2 AND question=$3 AND choice IS NULL').run(...key);
     }else{
-      const row=db.prepare('UPDATE quiz_attempts SET choice=? WHERE story_id=? AND chapter=? AND question=? AND choice IS NULL RETURNING english')
+      const row=await db.prepare('UPDATE quiz_attempts SET choice=$1 WHERE story_id=$2 AND chapter=$3 AND question=$4 AND choice IS NULL RETURNING english')
         .get(input.choice,...key);
       if(row){
         const now=Date.now();
-        recordAnswer(db,story,index,input.question,input.choice===question.correct,Boolean(row.english),now);
+        await recordAnswer(db,story,index,input.question,input.choice===question.correct,Boolean(row.english),now);
         for(const text of readingItems([...questionWords(question.prompt),...questionWords(question.choices[input.choice])]))
-          seeItem(db,text,now);
-        const answered=db.prepare('SELECT count(choice) AS total FROM quiz_attempts WHERE story_id=? AND chapter=?').get(id,index);
-        if(answered?.total===chapter.questions!.length)finishChapter(store,id,index);
+          await seeItem(db,text,now);
+        const answered=await db.prepare('SELECT count(choice) AS total FROM quiz_attempts WHERE story_id=$1 AND chapter=$2').get(id,index);
+        if(answered?.total===chapter.questions!.length)await finishChapter(store,id,index);
       }
     }
-    db.exec('COMMIT');
-  }catch(error){db.exec('ROLLBACK');throw error;}
-  return chapterCheck(store,id,index);
+
+  });
+  return await chapterCheck(store,id,index);
 }

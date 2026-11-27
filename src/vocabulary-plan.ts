@@ -1,21 +1,19 @@
-import {catalog} from './catalog.ts';
-import {hskReadingProgress,recordedStrengths,reviewCandidates} from './strength.ts';
-import {perfectScore} from './encounters.ts';
-import {ensureActions} from './word-actions.ts';
-import {flashcardHistory} from './flashcards.ts';
-import type {ReadingStore} from './store.ts';
-import {ensureCompletions} from './completion.ts';
-import type {Difficulty} from './story-plan.ts';
-import {storyDifficulty} from './story-difficulty.ts';
-import {nextTestLevel,unseenCharacters,unseenFocusChance} from './milestone-progress.ts';
+import { catalog } from './catalog.ts';
+import { hskReadingProgress,recordedStrengths,reviewCandidates } from './strength.ts';
+import { perfectScore } from './encounters.ts';
+import { flashcardHistory } from './flashcards.ts';
+import type { ReadingStore } from './store.ts';
+import type { Difficulty } from './story-plan.ts';
+import { storyDifficulty } from './story-difficulty.ts';
+import { nextTestLevel,unseenCharacters,unseenFocusChance } from './milestone-progress.ts';
 
 const day = 86_400_000;
 
-function readingEvidence(store:ReadingStore) {
+async function readingEvidence(store:ReadingStore) {
   const {db}=store;
-  ensureCompletions(db);
-  const recent=db.prepare(`SELECT c.story_id,c.chapter,c.at,
-    json_extract(s.content,'$.chapters['||c.chapter||'].paragraphs') AS paragraphs
+
+  const recent=await db.prepare(`SELECT c.story_id,c.chapter,c.at,
+    s.content->'chapters'->c.chapter->>'paragraphs' AS paragraphs
     FROM chapter_completions c JOIN stories s ON s.id=c.story_id ORDER BY c.at DESC`).all();
   const seen=new Map<string,{count:number;at:number}>();
   let aided=0, encountered=0;
@@ -28,7 +26,7 @@ function readingEvidence(store:ReadingStore) {
     }
     if(index<3) {
       encountered+=words.size;
-      const actions=db.prepare('SELECT count(DISTINCT word) AS count FROM word_actions WHERE story_id=? AND chapter=? AND at<=?')
+      const actions=await db.prepare('SELECT count(DISTINCT word) AS count FROM word_actions WHERE story_id=$1 AND chapter=$2 AND at<=$3')
         .get(row.story_id,row.chapter,row.at);
       aided+=Number(actions?.count??0);
     }
@@ -36,13 +34,13 @@ function readingEvidence(store:ReadingStore) {
   return {seen,chapters:recent.length,comfortable:recent.length>=2 && aided/Math.max(1,encountered)<=0.15};
 }
 
-export function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling:number, now:number, excluded:ReadonlySet<string>=new Set(),focusLimit:number=storyDifficulty[difficulty].focusCards) {
+export async function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling:number, now:number, excluded:ReadonlySet<string>=new Set(),focusLimit:number=storyDifficulty[difficulty].focusCards) {
   const {db}=store;
-  const strengths=reviewCandidates(db,now);
-  const attempts=flashcardHistory(db);
-  ensureActions(db);
-  const reading=readingEvidence(store);
-  const marks=db.prepare("SELECT word,max(at) AS at FROM word_actions WHERE kind='difficulty' GROUP BY word").all();
+  const strengths=await reviewCandidates(db,now);
+  const attempts=await flashcardHistory(db);
+
+  const reading=await readingEvidence(store);
+  const marks=await db.prepare("SELECT word,max(at) AS at FROM word_actions WHERE kind='difficulty' GROUP BY word").all();
   const lastMark=new Map(marks.map(row=>[String(row.word),Number(row.at)]));
   const perfect=new Set(strengths.filter(i=>i.score===perfectScore).map(i=>i.text));
   const available=(word:string)=>!lastMark.has(word) || now-lastMark.get(word)!>=day;
@@ -69,10 +67,10 @@ export function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling
   const difficult=new Set(candidates.filter(i=>i.score<0).map(i=>i.word));
   const due=candidates.filter(item=>item.dueAt<=now).sort((a,b)=>a.dueAt-b.dueAt)[0];
   const hard=difficulty==='hard';
-  const targetLevel=nextTestLevel(db);
-  const progress=hskReadingProgress(db)-(targetLevel-1);
+  const targetLevel=await nextTestLevel(db);
+  const progress=await hskReadingProgress(db)-(targetLevel-1);
   const band=catalog.libraryItems('character',targetLevel);
-  const rated=new Set(recordedStrengths(db).map(item=>item.text));
+  const rated=new Set((await recordedStrengths(db)).map(item=>item.text));
   const libraryUnseen=new Set(band.filter(item=>!rated.has(item.text)).map(item=>item.text));
   const chance=libraryUnseen.size?unseenFocusChance(progress,1-libraryUnseen.size/band.length):0;
   const nearMilestone=hard&&focusLimit===12&&chance===1;
@@ -82,7 +80,7 @@ export function vocabularyFor(store:ReadingStore, difficulty:Difficulty, ceiling
     :difficult.size>=3?0:Math.max(0,ceiling-difficult.size);
   const common=['茶','水','家','人','书','好','看','吃','来','去'];
   const newCharacters:string[]=[], newWords:string[]=[];
-  const missing=new Set(unseenCharacters(db,targetLevel));
+  const missing=new Set(await unseenCharacters(db,targetLevel));
   const levelWords=catalog.list('word',targetLevel).map(item=>item.text);
   // A word with manually assigned strength can still contain an unseen character.
   function* coverageTargets(){

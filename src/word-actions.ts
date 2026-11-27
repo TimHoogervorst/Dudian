@@ -1,10 +1,9 @@
-import type {DatabaseSync} from 'node:sqlite';
-import {catalog} from './catalog.ts';
-import {recordStoryPoints} from './story-scoring.ts';
-import {completionFor} from './completion.ts';
-import {readingItems,seeItem} from './encounters.ts';
-import {ReadingStore,HttpError,type Token,type Story} from './store.ts';
-import {strengthFor} from './strength.ts';
+import { catalog } from './catalog.ts';
+import { recordStoryPoints } from './story-scoring.ts';
+import { completionFor } from './completion.ts';
+import { readingItems,seeItem } from './encounters.ts';
+import { ReadingStore,HttpError,type Token,type Story } from './store.ts';
+import { strengthFor } from './strength.ts';
 
 // Authored senses for the bundled chapter, including copies already saved by earlier versions.
 const teaSenses: Record<string,string> = {
@@ -18,16 +17,6 @@ const teaSenses: Record<string,string> = {
   这里:'c130517133db07d9',看:'c0ce7d192746ebfe',雨:'ce4db149fe2741b7',明天:'ffe87c9653c8384e',
   来:'9d0fc32ac1dfd1bc',吗:'04944f2f0d92c0f9',再见:'2c2d61f3c7d913f2',
 };
-export function ensureActions(db: DatabaseSync) {
-  db.exec(`CREATE TABLE IF NOT EXISTS word_actions(
-    id TEXT PRIMARY KEY, story_id TEXT NOT NULL REFERENCES stories(id),
-    chapter INTEGER NOT NULL, paragraph INTEGER NOT NULL, token INTEGER NOT NULL,
-    word TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('lookup','difficulty')), at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS word_actions_chapter ON word_actions(story_id,chapter,kind,word);
-  CREATE TABLE IF NOT EXISTS reader_preferences(id INTEGER PRIMARY KEY,pinyin INTEGER NOT NULL);
-  INSERT OR IGNORE INTO reader_preferences VALUES(1,0);`);
-}
 
 export interface WordAction {storyId:string;chapter:number;paragraph:number;token:number;id:string;kind:'lookup'|'difficulty'}
 // Covers are outside the numbered chapters and have a single summary paragraph.
@@ -38,13 +27,13 @@ export function sentenceText(tokens:Token[],index:number) {
   const sentence=tokens[index].sentence;
   return tokens.filter(t=>t.sentence===sentence).map(t=>t.text).join('');
 }
-export function recordAction(store:ReadingStore, action:WordAction, now=Date.now()) {
+export async function recordAction(store:ReadingStore, action:WordAction, now=Date.now()) {
   const {db}=store;
   if (!action || !['difficulty','lookup'].includes(action.kind) || typeof action.id!=='string' || !action.id.length || action.id.length>100 ||
       typeof action.storyId!=='string' || ![action.chapter,action.paragraph,action.token].every(Number.isInteger)) {
     throw new HttpError(400,'Select a word in this chapter.');
   }
-  const story=store.story(action.storyId);
+  const story=await store.story(action.storyId);
   const occurrence=actionParagraph(story,action.chapter,action.paragraph)?.[action.token];
   if (!occurrence || !/\p{Script=Han}/u.test(occurrence.text)) throw new HttpError(400,'Select a Chinese word.');
   const {text}=occurrence;
@@ -53,30 +42,29 @@ export function recordAction(store:ReadingStore, action:WordAction, now=Date.now
   const item=catalog.get('word',occurrence.entry??text);
   const selected=item?.senses.find(candidate=>candidate.id===sense);
   if (!selected) throw new HttpError(422,'The dictionary sense for this word is unavailable.');
-  ensureActions(db);
-  db.exec('BEGIN IMMEDIATE');
-  try {
-    const result=db.prepare('INSERT OR IGNORE INTO word_actions VALUES(?,?,?,?,?,?,?,?)')
+
+  await db.transaction(async () => {
+    const result=await db.prepare('INSERT INTO word_actions(id,story_id,chapter,paragraph,token,word,kind,at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING')
       .run(action.id,story.id,action.chapter,action.paragraph,action.token,text,action.kind,now);
     if(result.changes){
       if(action.kind==='difficulty'){
-        const progress=completionFor(store,story.id);
+        const progress=await completionFor(store,story.id);
         if(!progress.finished && !progress.chapters.includes(action.chapter))
-          recordStoryPoints(db,story.id,action.chapter,text,-3,now,'incorrect');
+          await recordStoryPoints(db,story.id,action.chapter,text,-3,now,'incorrect');
       }
-      for(const item of readingItems([text]))seeItem(db,item,now);
+      for(const item of readingItems([text]))await seeItem(db,item,now);
     }
-    db.exec('COMMIT');
-  } catch(error) {db.exec('ROLLBACK');throw error;}
-  return {text,...(action.kind==='difficulty'?{color:strengthFor(db,'word',text).color}:{}),sense:selected.id,pinyin:selected.pinyin,meaning:selected.meaning};
+
+  });
+  return {text,...(action.kind==='difficulty'?{color:(await strengthFor(db,'word',text)).color}:{}),sense:selected.id,pinyin:selected.pinyin,meaning:selected.meaning};
 }
 
-export function usageHistory(store:ReadingStore,char:string) {
-  ensureActions(store.db);
-  return store.db.prepare(`SELECT * FROM word_actions WHERE kind='difficulty' AND instr(word,?)>0
-    ORDER BY at DESC`).all(char).map(row=>{
-    const story=store.story(String(row.story_id));
+export async function usageHistory(store:ReadingStore,char:string) {
+
+  return await Promise.all((await store.db.prepare(`SELECT * FROM word_actions WHERE kind='difficulty' AND strpos(word,$1)>0
+    ORDER BY at DESC`).all(char)).map(async row=>{
+    const story=await store.story(String(row.story_id));
     const tokens=actionParagraph(story,Number(row.chapter),Number(row.paragraph))!;
     return {word:String(row.word),at:Number(row.at),storyId:story.id,title:story.title,chapter:Number(row.chapter),sentence:sentenceText(tokens,Number(row.token))};
-  });
+  }));
 }

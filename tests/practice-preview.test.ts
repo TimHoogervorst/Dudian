@@ -1,26 +1,26 @@
-﻿import {test} from 'node:test';
+import { testStore } from './postgres-fixture.ts';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {ReadingStore} from '../src/store.ts';
-import {catalog} from '../src/catalog.ts';
-import {seeItem} from '../src/encounters.ts';
-import {practicePreview,confirmedPlan} from '../src/practice-preview.ts';
-import {adjustStrength,hskReadingProgress,setStrength} from '../src/strength.ts';
-import {chapterFocus,setPreferences} from '../src/story-plan.ts';
+import { catalog } from '../src/catalog.ts';
+import { seeItem } from '../src/encounters.ts';
+import { practicePreview,confirmedPlan } from '../src/practice-preview.ts';
+import { adjustStrength,hskReadingProgress,setStrength } from '../src/strength.ts';
+import { chapterFocus,setPreferences } from '../src/story-plan.ts';
 
-test('Hard + Long near 0.90 boosts only unseen HSK 1 characters and stops when they run out',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('Hard + Long near 0.90 boosts only unseen HSK 1 characters and stops when they run out',async t=>{
+  const store=await testStore();
   const {db}=store;
   const chars=catalog.libraryItems('character',1);
   const words=catalog.libraryItems('word',1);
-  for(const {text} of chars)if(text!=='姐'){setStrength(db,'character',text,'green');seeItem(db,text,Date.now());}
+  for(const {text} of chars)if(text!=='姐'){await setStrength(db,'character',text,'green');await seeItem(db,text,Date.now());}
   for(const {text} of words){
-    if(hskReadingProgress(db)>=0.90)break;
-    setStrength(db,'word',text,'green');
+    if(await hskReadingProgress(db)>=0.90)break;
+    await setStrength(db,'word',text,'green');
   }
-  for(const {text} of catalog.libraryItems('word',3).slice(0,12))setStrength(db,'word',text,'red');
+  for(const {text} of catalog.libraryItems('word',3).slice(0,12))await setStrength(db,'word',text,'red');
   for(const remaining of [1,0]){
-    if(!remaining){seeItem(db,'姐',Date.now());setStrength(db,'character','姐','green');}
-    const preview=practicePreview(store,{difficulty:'hard',chapterCount:5});
+    if(!remaining){await seeItem(db,'姐',Date.now());await setStrength(db,'character','姐','green');}
+    const preview=await practicePreview(store,{difficulty:'hard',chapterCount:5});
     const plan=confirmedPlan(store,preview.id,'hard',5);
     assert.equal(preview.cards.length,12);
     assert.deepEqual(plan.newCharacters,remaining?['姐']:[]);
@@ -28,32 +28,32 @@ test('Hard + Long near 0.90 boosts only unseen HSK 1 characters and stops when t
   }
 });
 
-test('after passing HSK 1 the late-level boost uses the HSK 2 Library pool',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('after passing HSK 1 the late-level boost uses the HSK 2 Library pool',async t=>{
+  const store=await testStore();
   const {db}=store;
   for(const level of [1,2])for(const kind of ['word','character'] as const){
     for(const {text} of catalog.libraryItems(kind,level)){
-      if(hskReadingProgress(db)>=1.90)break;
-      setStrength(db,kind,text,'green');seeItem(db,text,Date.now());
+      if(await hskReadingProgress(db)>=1.90)break;
+      await setStrength(db,kind,text,'green');await seeItem(db,text,Date.now());
     }
   }
-  db.prepare("INSERT INTO milestone_tests(id,level,status,sections) VALUES('first',1,'passed','[]')").run();
-  const preview=practicePreview(store,{difficulty:'hard',chapterCount:5});
+  await db.prepare("INSERT INTO milestone_tests(id,level,status,sections) VALUES('first',1,'passed','[]')").run();
+  const preview=await practicePreview(store,{difficulty:'hard',chapterCount:5});
   const plan=confirmedPlan(store,preview.id,'hard',5);
   assert(plan.newCharacters.length>=9);
   assert(plan.newCharacters.every(c=>catalog.get('character',c)?.level===2));
 });
 
-test('Medium + Long fills eleven distinct cards when only one HSK 1 character is new',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('Medium + Long fills eleven distinct cards when only one HSK 1 character is new',async t=>{
+  const store=await testStore();
   for(const item of catalog.libraryItems('character',1)){
     if(item.text==='姐')continue;
-    setStrength(store.db,'character',item.text,'green');
-    seeItem(store.db,item.text,Date.now());
+    await setStrength(store.db,'character',item.text,'green');
+    await seeItem(store.db,item.text,Date.now());
   }
-  for(const word of ['站','外面','女人'])setStrength(store.db,'word',word,'yellow');
-  const short=practicePreview(store,{difficulty:'medium',chapterCount:1});
-  const long=practicePreview(store,{difficulty:'medium',chapterCount:5,previewId:short.id});
+  for(const word of ['站','外面','女人'])await setStrength(store.db,'word',word,'yellow');
+  const short=await practicePreview(store,{difficulty:'medium',chapterCount:1});
+  const long=await practicePreview(store,{difficulty:'medium',chapterCount:5,previewId:short.id});
   const words=long.cards.map(card=>card.text);
   assert.equal(new Set(words).size,11);
   assert(words.some(word=>word.includes('姐')));
@@ -61,19 +61,19 @@ test('Medium + Long fills eleven distinct cards when only one HSK 1 character is
   assert.deepEqual(new Set([...plan.reviewWords,...plan.newWords]),new Set(words));
 });
 
-test('Hard + Long includes Library Unseen HSK 1 characters even after a recorded encounter',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('Hard + Long includes Library Unseen HSK 1 characters even after a recorded encounter',async t=>{
+  const store=await testStore();
   const {db}=store;
   const unrated=[...'起语关系国'];
   for(const {text} of catalog.libraryItems('character',1)){
-    seeItem(db,text,Date.now());
-    if(!unrated.includes(text))setStrength(db,'character',text,'green');
+    await seeItem(db,text,Date.now());
+    if(!unrated.includes(text))await setStrength(db,'character',text,'green');
   }
   for(const {text} of catalog.libraryItems('word',1)){
-    if(hskReadingProgress(db)>=.90)break;
-    setStrength(db,'word',text,'green');
+    if(await hskReadingProgress(db)>=.90)break;
+    await setStrength(db,'word',text,'green');
   }
-  const preview=practicePreview(store,{difficulty:'hard',chapterCount:5});
+  const preview=await practicePreview(store,{difficulty:'hard',chapterCount:5});
   const plan=confirmedPlan(store,preview.id,'hard',5);
   assert.equal(preview.cards.length,12);
   assert.deepEqual(new Set(plan.newCharacters),new Set(unrated));
@@ -81,41 +81,41 @@ test('Hard + Long includes Library Unseen HSK 1 characters even after a recorded
     assert(plan.newCharacters.includes(char),char);
     assert(plan.newWords.some(word=>word.includes(char)),char);
   }
-  assert.deepEqual(db.prepare('SELECT count(*) AS n FROM milestone_characters').get()?.n,catalog.libraryItems('character',1).length);
+  assert.deepEqual((await db.prepare('SELECT count(*) AS n FROM milestone_characters').get())?.n,catalog.libraryItems('character',1).length);
 });
 
-test('Hard fills six focus cards with struggling reviews and eligible new characters',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('Hard fills six focus cards with struggling reviews and eligible new characters',async t=>{
+  const store=await testStore();
   const struggling=['昨天','先生','椅子','学生','老师','朋友'];
-  for(const word of struggling.slice(0,3))setStrength(store.db,'word',word,'red');
-  setStrength(store.db,'word','东西','yellow');
-  const preview=()=>practicePreview(store,{difficulty:'hard',chapterCount:1});
-  const mixed=preview();
+  for(const word of struggling.slice(0,3))await setStrength(store.db,'word',word,'red');
+  await setStrength(store.db,'word','东西','yellow');
+  const preview=async ()=>await practicePreview(store,{difficulty:'hard',chapterCount:1});
+  const mixed=await preview();
   const plan=confirmedPlan(store,mixed.id,'hard',1);
   assert.deepEqual(new Set(plan.reviewWords),new Set(struggling.slice(0,3)));
   assert.deepEqual(mixed.cards.map(c=>c.color),['red','red','red','gray','gray','gray']);
   assert.equal(plan.newCharacters.length,3);
-  assert.equal(practicePreview(store,{difficulty:'medium',chapterCount:1}).cards.length,3);
-  assert.equal(practicePreview(store,{difficulty:'easy',chapterCount:1}).cards.length,2);
-  setPreferences(store,{difficulty:'hard',ceilings:{easy:2,medium:3,hard:1}});
-  const limited=preview();
+  assert.equal((await practicePreview(store,{difficulty:'medium',chapterCount:1})).cards.length,3);
+  assert.equal((await practicePreview(store,{difficulty:'easy',chapterCount:1})).cards.length,2);
+  await setPreferences(store,{difficulty:'hard',ceilings:{easy:2,medium:3,hard:1}});
+  const limited=await preview();
   assert.equal(confirmedPlan(store,limited.id,'hard',1).newCharacters.length,1);
   assert.ok(limited.cards.some(c=>c.text==='东西'));
-  for(const word of struggling.slice(3))setStrength(store.db,'word',word,'red');
-  assert.deepEqual(new Set(preview().cards.map(c=>c.text)),new Set(struggling));
+  for(const word of struggling.slice(3))await setStrength(store.db,'word',word,'red');
+  assert.deepEqual(new Set((await preview()).cards.map(c=>c.text)),new Set(struggling));
 });
 
-test('a reroll replaces one focus, survives resizing, and binds generation to its preview', t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
-  for(const c of '我你是好吗')setStrength(store.db,'character',c,'green');
-  const before=hskReadingProgress(store.db);
+test('a reroll replaces one focus, survives resizing, and binds generation to its preview', async t=>{
+  const store=await testStore();
+  for(const c of '我你是好吗')await setStrength(store.db,'character',c,'green');
+  const before=await hskReadingProgress(store.db);
   const options={difficulty:'medium',chapterCount:1} as const;
-  const first=practicePreview(store,options);
+  const first=await practicePreview(store,options);
   assert.ok(first.cards.length>=2 && first.cards.length<=6);
-  const second=practicePreview(store,{...options,previewId:first.id,reroll:first.cards[0].text});
+  const second=await practicePreview(store,{...options,previewId:first.id,reroll:first.cards[0].text});
   assert.notEqual(second.cards[0].text,first.cards[0].text);
   assert.deepEqual(second.cards.slice(1),first.cards.slice(1));
-  const longer=practicePreview(store,{...options,chapterCount:2,previewId:second.id});
+  const longer=await practicePreview(store,{...options,chapterCount:2,previewId:second.id});
   const words=longer.cards.map(c=>c.text);
   assert.deepEqual(words.slice(0,second.cards.length),second.cards.map(c=>c.text));
   assert.equal(words.length,second.cards.length+2);
@@ -124,43 +124,43 @@ test('a reroll replaces one focus, survives resizing, and binds generation to it
   assert.deepEqual(new Set([...plan.reviewWords,...plan.newWords,...(plan.compound?[plan.compound]:[])]),new Set(words));
   assert.throws(()=>confirmedPlan(store,longer.id,'hard',2));
   assert.ok(longer.projected>second.projected);
-  assert.equal(hskReadingProgress(store.db),before);
+  assert.equal(await hskReadingProgress(store.db),before);
 });
 
-test('long Hard stories advance a four-word window by two and shrink back to the short budget',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
-  setStrength(store.db,'word','咖啡','yellow');
+test('long Hard stories advance a four-word window by two and shrink back to the short budget',async t=>{
+  const store=await testStore();
+  await setStrength(store.db,'word','咖啡','yellow');
   const options={difficulty:'hard',chapterCount:5} as const;
-  const preview=practicePreview(store,options);
+  const preview=await practicePreview(store,options);
   assert.equal(preview.cards.length,12);
   const groups=chapterFocus(confirmedPlan(store,preview.id,'hard',5));
   for(let i=0;i<5;i++){
     assert.deepEqual(groups[i],preview.cards.slice(2*i,2*i+4).map(card=>card.text));
   }
-  const shorter=practicePreview(store,{...options,chapterCount:1,previewId:preview.id});
+  const shorter=await practicePreview(store,{...options,chapterCount:1,previewId:preview.id});
   assert.equal(confirmedPlan(store,shorter.id,'hard',1).newCharacters.length,5);
-  setPreferences(store,{difficulty:'hard',ceilings:{easy:0,medium:0,hard:0}});
-  const reviewOnly=practicePreview(store,options);
+  await setPreferences(store,{difficulty:'hard',ceilings:{easy:0,medium:0,hard:0}});
+  const reviewOnly=await practicePreview(store,options);
   assert.equal(confirmedPlan(store,reviewOnly.id,'hard',5).newCharacters.length,0);
 });
 
-test('practice estimates respect strength and HSK caps', t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('practice estimates respect strength and HSK caps', async t=>{
+  const store=await testStore();
   const options={difficulty:'hard',chapterCount:5} as const;
-  const draft=practicePreview(store,options);
-  for(const c of draft.cards)adjustStrength(store.db,c.kind,c.text,36);
-  const full=practicePreview(store,{...options,previewId:draft.id});
+  const draft=await practicePreview(store,options);
+  for(const c of draft.cards)await adjustStrength(store.db,c.kind,c.text,36);
+  const full=await practicePreview(store,{...options,previewId:draft.id});
   assert.ok(full.cards.every(c=>c.gain===0));
   assert.equal(full.projected,full.level);
 });
-test('each practice visit rotates five subjects and the confirmed plan uses the chosen one',t=>{
-  const store=new ReadingStore();t.after(()=>store.db.close());
+test('each practice visit rotates five subjects and the confirmed plan uses the chosen one',async t=>{
+  const store=await testStore();
   const options={difficulty:'easy',chapterCount:1} as const;
-  const first=practicePreview(store,options);
-  const next=practicePreview(store,options);
+  const first=await practicePreview(store,options);
+  const next=await practicePreview(store,options);
   assert.equal(new Set(next.subjects.map(s=>s.zh)).size,5);
   assert.ok(next.subjects.every(s=>!first.subjects.some(other=>s.zh===other.zh)));
-  const resized=practicePreview(store,{...options,chapterCount:2,previewId:next.id});
+  const resized=await practicePreview(store,{...options,chapterCount:2,previewId:next.id});
   assert.deepEqual(resized.subjects,next.subjects);
   const chosen=next.subjects[3];
   assert.deepEqual(confirmedPlan(store,resized.id,'easy',2,chosen.zh).subject,chosen);

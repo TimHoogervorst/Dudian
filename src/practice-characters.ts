@@ -1,8 +1,8 @@
-import {catalog} from './catalog.ts';
-import {nextTestLevel} from './milestone-progress.ts';
-import {recordedStrengths} from './strength.ts';
-import type {ReadingStore} from './store.ts';
-import type {StoryPlan} from './story-plan.ts';
+import { catalog } from './catalog.ts';
+import { nextTestLevel } from './milestone-progress.ts';
+import { recordedStrengths } from './strength.ts';
+import type { ReadingStore } from './store.ts';
+import type { StoryPlan } from './story-plan.ts';
 
 const starter = '我是你好吗';
 export interface PracticeCharacters {
@@ -12,9 +12,9 @@ export interface PracticeCharacters {
   beginner:boolean;
 }
 
-export function personalizeCharacters(store:ReadingStore, plan:StoryPlan, excluded:ReadonlySet<string>) {
-  const scores=recordedStrengths(store.db);
-  const passed=nextTestLevel(store.db)-1;
+export async function personalizeCharacters(store:ReadingStore, plan:StoryPlan, excluded:ReadonlySet<string>) {
+  const scores=await recordedStrengths(store.db);
+  const passed=await nextTestLevel(store.db)-1;
   const beginner=passed===0 && !scores.some(item=>item.score!==0);
   const familiar=scores.filter(item=>item.kind==='character' && item.score>=6).map(item=>item.text);
   const available=new Set(catalog.list('character').filter(item=>item.level<=passed).map(item=>item.text));
@@ -26,7 +26,7 @@ export function personalizeCharacters(store:ReadingStore, plan:StoryPlan, exclud
       characters:{passed,familiar:'',available:[...available].join(''),beginner}};
   }
   // Previously encountered starter characters can support the next story while still learning.
-  const seen=store.db.prepare('SELECT text FROM milestone_characters WHERE instr(?,text)>0').all(starter);
+  const seen=await store.db.prepare('SELECT text FROM milestone_characters WHERE strpos($1,text)>0').all(starter);
   for(const {text} of seen)available.add(String(text));
   for(const item of scores)if(item.kind==='word'&&item.score>=6){
     for(const c of item.text)available.add(c);

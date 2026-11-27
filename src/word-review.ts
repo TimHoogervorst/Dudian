@@ -1,29 +1,29 @@
-import {randomInt} from 'node:crypto';
-import {catalog} from './catalog.ts';
-import type {ChapterQuestion,ReadingStore,Story} from './store.ts';
-import type {StoryPlan} from './story-plan.ts';
-import {strengthFor} from './strength.ts';
-import {ensureActions} from './word-actions.ts';
-import {encounterFor,perfectScore} from './encounters.ts';
+import { randomInt } from 'node:crypto';
+import { catalog } from './catalog.ts';
+import type { ChapterQuestion,ReadingStore,Story } from './store.ts';
+import type { StoryPlan } from './story-plan.ts';
+import { reviewCandidates } from './strength.ts';
+import { perfectScore } from './encounters.ts';
 
 export function reviewBoundaries(plan:StoryPlan){
   if(plan.chapterCount===1)return [0];
   return Array.from({length:Math.floor(plan.chapterCount/2)},(_,i)=>2*i+1);
 }
 
-export function planWordReviews(store:ReadingStore,plan:StoryPlan){
+export async function planWordReviews(store:ReadingStore,plan:StoryPlan){
   if(plan.characters?.beginner)return [];
   const boundaries=reviewBoundaries(plan);
   const size={easy:2,medium:5,hard:10}[plan.difficulty];
   const focus=new Set([...plan.newWords,...plan.reviewWords,...(plan.compound?[plan.compound]:[])]);
   const chars=new Set([...plan.newCharacters,...plan.reviewCharacters??[],...[...focus].join('')]);
-  ensureActions(store.db);
-  const cooling=new Set(store.db.prepare("SELECT DISTINCT word FROM word_actions WHERE kind='difficulty' AND at>?")
-    .all(Date.now()-86400000).map(row=>String(row.word)));
+
+  const cooling=new Set((await store.db.prepare("SELECT DISTINCT word FROM word_actions WHERE kind='difficulty' AND at>$1")
+    .all(Date.now()-86400000)).map(row=>String(row.word)));
   const vocabulary=[...new Set([...focus,...plan.background])];
+  const scores=new Map((await reviewCandidates(store.db,Date.now())).map(item=>[item.text,item]));
   const ranked=vocabulary.filter(word=>[...word].length>1 && !cooling.has(word) && catalog.get('word',word))
     .map(word=>({word,focus:focus.has(word),related:[...word].filter(c=>chars.has(c)).length,
-      score:strengthFor(store.db,'word',word).score??5,dueAt:encounterFor(store.db,word).dueAt??Infinity,tie:Math.random()}))
+      score:scores.get(word)?.score??5,dueAt:scores.get(word)?.dueAt??Infinity,tie:Math.random()}))
     .filter(item=>item.score<perfectScore)
     .sort((a,b)=>Number(b.focus)-Number(a.focus)||b.related-a.related||a.score-b.score||b.tie-a.tie);
   const overdue=ranked.filter(item=>item.dueAt<=Date.now()).sort((a,b)=>a.dueAt-b.dueAt);

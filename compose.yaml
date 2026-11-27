@@ -1,11 +1,32 @@
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: dudian
+      POSTGRES_USER: dudian
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dudian-local}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dudian -d dudian"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
   reader:
     build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3000:3000"
       - "127.0.0.1:14551:14551"
     environment:
       DATA_DIR: /data
+      PGHOST: postgres
+      PGUSER: dudian
+      PGDATABASE: dudian
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dudian-local}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SIWC_BIND: 0.0.0.0
       DUDIAN_COVER_JOBS: /cover-jobs
     volumes:
@@ -13,3 +34,4 @@ services:
       - ./.work/cover-jobs:/cover-jobs
 volumes:
   reader-data: {}
+  postgres-data: {}

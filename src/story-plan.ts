@@ -1,6 +1,6 @@
 import { vocabularyFor } from './vocabulary-plan.ts';
-import { HttpError, type ReadingStore } from './store.ts';
-import {lengthBudget,storyDifficulty} from './story-difficulty.ts';
+import { HttpError,type ReadingStore } from './store.ts';
+import { lengthBudget,storyDifficulty } from './story-difficulty.ts';
 
 export const difficulties = ['easy','medium','hard'] as const;
 export type Difficulty = typeof difficulties[number];
@@ -38,23 +38,20 @@ export function chapterFocus(plan:StoryPlan){
   });
 }
 
-function ensurePreferences(store: ReadingStore) {
-  store.db.exec('CREATE TABLE IF NOT EXISTS story_preferences (learner INTEGER PRIMARY KEY REFERENCES learners(id), preferences TEXT NOT NULL)');
-}
-export function getPreferences(store: ReadingStore): Preferences {
-  ensurePreferences(store);
-  const row = store.db.prepare('SELECT preferences FROM story_preferences WHERE learner=1').get();
+export async function getPreferences(store: ReadingStore): Promise<Preferences> {
+
+  const row = await store.db.prepare('SELECT preferences FROM story_preferences ').get();
   return row ? JSON.parse(String(row.preferences)) : {difficulty:'easy',ceilings:{easy:2,medium:3,hard:5}};
 }
-export function setPreferences(store: ReadingStore, input: Preferences) {
+export async function setPreferences(store: ReadingStore, input: Preferences) {
   if (!input || !difficulties.includes(input.difficulty) || !difficulties.every(key =>
     Number.isSafeInteger(input.ceilings?.[key]) && input.ceilings[key] >= 0)) {
     throw new HttpError(400,'Choose a difficulty and whole-number character ceilings of zero or more.');
   }
   const {easy,medium,hard} = input.ceilings;
   const preferences = {difficulty:input.difficulty,ceilings:{easy,medium,hard}};
-  ensurePreferences(store);
-  store.db.prepare('INSERT INTO story_preferences VALUES(1,?) ON CONFLICT(learner) DO UPDATE SET preferences=excluded.preferences').run(JSON.stringify(preferences));
+
+  await store.db.prepare('INSERT INTO story_preferences (preferences) VALUES($1) ON CONFLICT(account_id) DO UPDATE SET preferences=excluded.preferences').run(JSON.stringify(preferences));
   return preferences;
 }
 
@@ -63,9 +60,9 @@ export function readingSize(difficulty:Difficulty,chapterCount:number){
   return {difficulty,chapterCount,targetWords:chapterCount*(min+max)/2*40};
 }
 
-export function buildPlan(store: ReadingStore,difficulty: Difficulty,chapterCount: number,now=Date.now(),excluded?:ReadonlySet<string>): StoryPlan {
+export async function buildPlan(store: ReadingStore,difficulty: Difficulty,chapterCount: number,now=Date.now(),excluded?:ReadonlySet<string>): Promise<StoryPlan> {
   if (!difficulties.includes(difficulty) || !validLength(chapterCount)) throw new HttpError(400,'Choose a story length and difficulty.');
-  const ceiling=lengthBudget(getPreferences(store).ceilings[difficulty],chapterCount);
+  const ceiling=lengthBudget((await getPreferences(store)).ceilings[difficulty],chapterCount);
   const focusLimit=lengthBudget(storyDifficulty[difficulty].focusCards,chapterCount);
-  return {...readingSize(difficulty,chapterCount),ceiling,...vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
+  return {...readingSize(difficulty,chapterCount),ceiling,...await vocabularyFor(store,difficulty,ceiling,now,excluded,focusLimit)};
 }

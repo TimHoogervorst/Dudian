@@ -8,6 +8,10 @@ The learner reads Chinese stories and uses encounters with unfamiliar language t
 
 The collection of stories available to all learners. Each story has a common text and character focus, and each learner has their own reading history with it.
 
+**Character focus**
+
+The characters a story is designed to practice. Every learner sees the same focus characters alongside their own current status for each one.
+
 **Reading type**
 
 The form of reading the learner chooses for a practice session. Book uses narrative prose, Article presents material such as notices, letters, recipes, and reports, and Dialogue presents a conversation as messages.

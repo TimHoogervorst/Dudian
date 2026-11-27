@@ -79,7 +79,7 @@ export function setup(ui) {
   async function watchShelf(list,context,manage){
     const {signal,onLeave}=context;
     const steps=['planning','writing','checking','questions','saving'];
-    const labels={planning:'Planning vocabulary',writing:'Writing chapters',checking:'Checking vocabulary',revising:'Revising chapters',questions:'Preparing questions',saving:'Saving story'};
+    const labels={queued:'Waiting for generation',planning:'Planning vocabulary',writing:'Writing chapters',checking:'Checking vocabulary',revising:'Revising chapters',questions:'Preparing questions',saving:'Saving story'};
     let timer,previous,card;
     onLeave(()=>clearTimeout(timer));
     async function poll(){

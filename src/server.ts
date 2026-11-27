@@ -1,15 +1,19 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, extname, resolve, sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { ReadingStore, HttpError } from './store.ts';
-import {readerChapters} from './chapter-check.ts';
-import {strengthFor} from './strength.ts';
-import {storyFocus} from './story-scoring.ts';
-import type {PreviewItem} from './store.ts';
-import {markAdvance} from './activity.ts';
-import {prepareMilestones} from './milestone-test.ts';
-import {initializeGeneration} from './generation-job.ts';
+import { createServer,type IncomingMessage,type ServerResponse } from 'node:http';
+import { existsSync,mkdirSync,readdirSync,readFileSync,statSync } from 'node:fs';
+import { join,extname,resolve,sep } from 'node:path';
+import { fileURLToPath,pathToFileURL } from 'node:url';
+import { ReadingStore,HttpError } from './store.ts';
+import { readerChapters } from './chapter-check.ts';
+import { strengthFor } from './strength.ts';
+import { storyFocus } from './story-scoring.ts';
+import type { PreviewItem } from './store.ts';
+import { markAdvance } from './activity.ts';
+import { prepareMilestones } from './milestone-test.ts';
+import { generationWorker } from './generation-job.ts';
+import { database,initializeDatabase } from './postgres/database.ts';
+import { LearnerDatabase } from './postgres/learner-database.ts';
+import { authenticate,sessionAccount } from './postgres/session.ts';
+import type { Pool } from 'pg';
 
 const root = fileURLToPath(new URL('../',import.meta.url));
 const publicDir = join(root,'public');
@@ -34,27 +38,18 @@ async function body(req: IncomingMessage) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8')); }
   catch { throw new HttpError(400,'Expected a JSON request.'); }
 }
-export async function createApp(store: ReadingStore) {
-  initializeGeneration(store);
+export async function createApp(pool: Pool) {
+  await initializeDatabase(pool);
+  await pool.query("UPDATE story_art SET status='failed',error='Drawing was interrupted. Retry the illustration.' WHERE status='drawing'");
+  const stores=new Map<string,ReadingStore>();
+  const scores=new Map<string,number>();
   const features: Handler[] = [];
   for (const file of files('src/features').filter(f=>f.endsWith('.ts'))) {
     const feature = await import(pathToFileURL(join(root,'src/features',file)).href);
     if (typeof feature.default === 'function') features.push(feature.default);
   }
-  // Ordinary reader requests can change eligibility. Only rescan the curriculum
-  // when a score change has been recorded.
-  const changes=store.db.prepare('SELECT coalesce(max(rowid),0) AS scores FROM score_changes');
-  let last=changes.get()!;
-  prepareMilestones(store.db);
-  return createServer(async (req,res)=>{
+  const server=createServer(async (req,res)=>{
     function json(status:number,value:unknown) {
-      if(req.method==='POST'&&status<300){
-        const now=changes.get()!;
-        if(now.scores!==last.scores||/^\/api\/milestone-tests\/[^/]+\/(submit|discard)$/.test(req.url??'')){
-          prepareMilestones(store.db);
-          last=now;
-        }
-      }
       res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
       res.end(JSON.stringify(value));
     }
@@ -65,44 +60,74 @@ export async function createApp(store: ReadingStore) {
       if (req.method !== 'GET' && req.method !== 'HEAD' && req.headers.origin) {
         if (new URL(req.headers.origin).host !== req.headers.host) throw new HttpError(403,'Cross-origin writes are unavailable.');
       }
-      const ctx = {req,res,url,store,json,body:()=>body(req)};
-      for (const feature of features) if (await feature(ctx)) return;
-      if (path==='/api/features' && req.method==='GET') {
-        const assets=files('public/features');
-        return json(200,{js:assets.filter(f=>f.endsWith('.js')),css:assets.filter(f=>f.endsWith('.css'))});
+      if (path==='/api/session' && req.method==='GET') {
+        const account=await sessionAccount(pool,req);
+        return json(200,{username:account?.username??null});
       }
-      if (path==='/api/stories' && req.method==='GET') return json(200,store.stories());
-      const match = path.match(/^\/api\/stories\/([^/]+)(\/position)?$/);
-      if (match && !match[2] && req.method==='GET') {
-        const story=store.story(match[1]);
-        const preview=story.preview;
-        const focus=new Map<string,PreviewItem>();
-        let ordered:PreviewItem[]=[];
-        if(url.searchParams.has('focus') && preview){
-          for(const item of [...preview.words??[],...preview.compound?[preview.compound]:[],...preview.characters??[],
-            ...preview.review??[],...preview.wordReview??[]]){
-            const entry=focus.get(item.text)??{text:item.text};
-            entry.pinyin||=item.pinyin;
-            entry.meaning||=item.meaning;
-            entry.example||=item.example;
-            focus.set(item.text,entry);
-          }
-          const tier=storyFocus(story);
-          const order={strong:0,medium:1,soft:2,other:3};
-          ordered=[...focus.values()].sort((a,b)=>order[tier(a.text)]-order[tier(b.text)]);
+      if (req.method==='POST' && ['/api/login','/api/register','/api/logout'].includes(path)) {
+        return json(200,await authenticate(pool,path,req,res,path==='/api/logout'?null:await body(req)));
+      }
+      if (path.startsWith('/api/')) {
+        const account=await sessionAccount(pool,req);
+        if (!account) throw new HttpError(401,'Sign in to open your reader.');
+        let store=stores.get(account.id);
+        if (!store) {
+          store=new ReadingStore(new LearnerDatabase(pool,account.id));
+          stores.set(account.id,store);
         }
-        return json(200,{...(url.searchParams.has('focus')?{focus:ordered.map(item=>({...item,color:strengthFor(store.db,'word',item.text).color}))}:{}),story:{...story,chapters:readerChapters(store,story)},position:store.position(match[1])});
-      }
-      if (match && match[2] && req.method==='POST') {
-        const {chapter,paragraph}=await ctx.body();
-        const previous=store.position(match[1]);
-        store.db.exec('BEGIN IMMEDIATE');
-        try {
-          const position=store.move(match[1],chapter,paragraph);
-          if(previous.chapter!==chapter||previous.paragraph!==paragraph)markAdvance(store,match[1],chapter);
-          store.db.exec('COMMIT');
-          return json(200,position);
-        }catch(error){store.db.exec('ROLLBACK');throw error;}
+        let response: {status:number,value:unknown} | undefined;
+        const reply=(status:number,value:unknown)=>{response={status,value};};
+        const ctx = {req,res,url,store,json:reply,body:()=>body(req)};
+        for (const feature of features) if (await feature(ctx)) {
+          if (response && (req.method==='POST'||!scores.has(account.id))) {
+            const count=Number((await store.db.prepare('SELECT coalesce(max(rowid),0) AS n FROM score_changes').get()).n);
+            if(count!==scores.get(account.id)||/milestone-tests.*(submit|discard)/.test(path)){
+              scores.set(account.id,count);
+              await prepareMilestones(store.db);
+            }
+          }
+          if(response) json(response.status,response.value);
+          return;
+        }
+        if (path==='/api/features' && req.method==='GET') {
+          const assets=files('public/features');
+          return json(200,{js:assets.filter(f=>f.endsWith('.js')),css:assets.filter(f=>f.endsWith('.css'))});
+        }
+        if (path==='/api/stories' && req.method==='GET') return json(200,await store.stories());
+        const match = path.match(/^\/api\/stories\/([^/]+)(\/position)?$/);
+        if (match && !match[2] && req.method==='GET') {
+          const story=await store.story(match[1]);
+          const preview=story.preview;
+          const focus=new Map<string,PreviewItem>();
+          let ordered:PreviewItem[]=[];
+          if(url.searchParams.has('focus') && preview){
+            for(const item of [...preview.words??[],...preview.compound?[preview.compound]:[],...preview.characters??[],
+              ...preview.review??[],...preview.wordReview??[]]){
+              const entry=focus.get(item.text)??{text:item.text};
+              entry.pinyin||=item.pinyin;
+              entry.meaning||=item.meaning;
+              entry.example||=item.example;
+              focus.set(item.text,entry);
+            }
+            const tier=storyFocus(story);
+            const order={strong:0,medium:1,soft:2,other:3};
+            ordered=[...focus.values()].sort((a,b)=>order[tier(a.text)]-order[tier(b.text)]);
+          }
+          return json(200,{...(url.searchParams.has('focus')?{focus:await Promise.all(ordered.map(async item=>({...item,color:(await strengthFor(store.db,'word',item.text)).color})))}:{}),story:{...story,chapters:await readerChapters(store,story)},position:await store.position(match[1])});
+        }
+        if (match && match[2] && req.method==='POST') {
+          const {chapter,paragraph}=await ctx.body();
+          const current=store;
+          const saved=await store.db.transaction(async () => {
+            const previous=await current.position(match[1]);
+            const position=await current.move(match[1],chapter,paragraph);
+            if(previous.chapter!==chapter||previous.paragraph!==paragraph)await markAdvance(current,match[1],chapter);
+
+            return position;
+          });
+          return json(200,saved);
+        }
+        return json(404,{error:'Unknown API endpoint.'});
       }
       if (req.method!=='GET' && req.method!=='HEAD') return json(405,{error:'Method unavailable.'});
       const artwork = path==='/art/tea-shop.png';
@@ -111,16 +136,20 @@ export async function createApp(store: ReadingStore) {
       res.writeHead(200,{'Content-Type':mime[extname(filename)]??'application/octet-stream'});
       res.end(req.method==='HEAD'?undefined:readFileSync(filename));
     } catch (e) {
-      if (res.headersSent) { res.end(); return; }
+      if (res.headersSent) { console.error('Reader request:',(e as Error).message); return; }
       const error = e as Error & { status?:number };
-      json(error.status ?? 500,{error:error.message || 'Unable to process request.'});
+      if (!error.status) console.error('Reader request:', error.message);
+      json(error.status ?? 500,{error:error.status ? error.message : 'Unable to process request.'});
     }
   });
+  const stop=generationWorker(pool);
+  server.once('close',stop);
+  return server;
 }
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href===import.meta.url) {
   const dir = process.env.DATA_DIR ?? join(root,'runtime');
   mkdirSync(dir,{recursive:true});
-  const app = await createApp(new ReadingStore(join(dir,'reading.sqlite')));
+  const app = await createApp(database());
   const port = Number(process.env.PORT ?? 3000);
   app.listen(port,process.env.HOST ?? '0.0.0.0',()=>console.log('Dudian is listening on port '+port));
 }

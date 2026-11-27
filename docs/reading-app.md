@@ -2,7 +2,7 @@
 
 ## Product brief
 
-An open-source TypeScript web app runs locally in Docker with one seeded admin learner. Desktop and mobile share that learner’s progress. Use the Sign in with ChatGPT preview for story generation, subject to a successful end-to-end account test. The first release focuses on reading. Speaking and Listening appear as disabled practice choices.
+The TypeScript web app runs locally in Docker. Learners create accounts with a username and password and can resume their progress on desktop or mobile. The host connects to ChatGPT for story generation. The first release focuses on reading. Speaking and Listening appear as disabled practice choices.
 
 ### The reading loop
 
@@ -116,4 +116,4 @@ Use the story focus tier to score the tested word and any explicitly tested char
 
 Bundle pinned versions of CC-CEDICT and the six-level HSK vocabulary lists with the app. Include source versions, attribution, and license notices. Saved stories retain their word annotations so dictionary lookups and flashcards work while the Docker app is running, even when the AI service is unavailable.
 
-Store stories, reading positions, and learner progress in a single backend SQLite database on a persistent Docker volume. Desktop and mobile use the same learner record. Rebuilding the container preserves progress when the volume is retained.
+The backend stores the shared story catalog and account-owned progress in PostgreSQL on a persistent Docker volume. Each device uses the signed-in learner’s bookmark, history, and character strength.

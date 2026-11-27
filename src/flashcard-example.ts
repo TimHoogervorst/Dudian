@@ -1,11 +1,11 @@
-import type {DatabaseSync} from 'node:sqlite';
-import {readSession} from './flashcards.ts';
-import type {ItemKind} from './catalog.ts';
-import {HttpError,type Story} from './store.ts';
+import type { LearnerDatabase } from './postgres/learner-database.ts';
+import { readSession } from './flashcards.ts';
+import type { ItemKind } from './catalog.ts';
+import { HttpError,type Story } from './store.ts';
 
-export function storedExample(db:DatabaseSync,kind:ItemKind,text:string,target?:{senseId?:string;pinyin:string;meaning:string}){
-  const stories=db.prepare(`SELECT content FROM stories WHERE instr(content,?)>0
-    AND id NOT IN (SELECT story_id FROM hidden_stories) ORDER BY created_at DESC`).iterate(text);
+export async function storedExample(db:LearnerDatabase,kind:ItemKind,text:string,target?:{senseId?:string;pinyin:string;meaning:string}){
+  const stories=await db.prepare(`SELECT content FROM stories WHERE strpos(content::text,$1)>0
+    AND id NOT IN (SELECT story_id FROM hidden_stories) ORDER BY created_at DESC`).all(text);
   for(const row of stories){
     const story:Story=JSON.parse(String(row.content));
     for(const chapter of story.chapters)for(const paragraph of chapter.paragraphs){
@@ -26,16 +26,16 @@ export function storedExample(db:DatabaseSync,kind:ItemKind,text:string,target?:
     }
   }
   if(target)return;
-  db.exec('CREATE TABLE IF NOT EXISTS flashcard_examples(text TEXT PRIMARY KEY,before_text TEXT NOT NULL,after_text TEXT NOT NULL)');
-  const find=db.prepare('SELECT before_text AS before,text AS target,after_text AS after FROM flashcard_examples WHERE text=?');
-  return find.get(text) as {before:string;target:string;after:string}|undefined;
+
+  const find=db.prepare('SELECT before_text AS before,text AS target,after_text AS after FROM flashcard_examples WHERE text=$1');
+  return (await find.get(text)) as {before:string;target:string;after:string}|undefined;
 }
 
-export async function flashcardExample(db:DatabaseSync,id:string,index:number,write?:(prompt:string)=>Promise<string>){
-  const session=readSession(db,id);
+export async function flashcardExample(db:LearnerDatabase,id:string,index:number,write?:(prompt:string)=>Promise<string>){
+  const session=await readSession(db,id);
   if(!session.card||index!==session.index)throw new HttpError(409,'Reopen the current flashcard.');
   const {kind,text}=session.card;
-  const saved=storedExample(db,kind,text);
+  const saved=await storedExample(db,kind,text);
   if(saved)return saved;
   if(!write)throw new HttpError(404,'No saved example for this entry.');
   const raw=await write('Write one short natural simplified Chinese example sentence using '+text+' in context. Use easy everyday surrounding vocabulary. '+
@@ -46,6 +46,6 @@ export async function flashcardExample(db:DatabaseSync,id:string,index:number,wr
     !/\p{Script=Han}/u.test(parts.before+parts.after)||parts.before.length+parts.after.length>100||!/[。！？]$/u.test(parts.after)){
     throw new HttpError(502,'A usable Chinese sentence was not returned. Try the hint again.');
   }
-  db.prepare('INSERT OR IGNORE INTO flashcard_examples VALUES(?,?,?)').run(text,parts.before,parts.after);
+  await db.prepare('INSERT INTO flashcard_examples VALUES($1,$2,$3) ON CONFLICT DO NOTHING').run(text,parts.before,parts.after);
   return {before:parts.before,target:text,after:parts.after};
 }

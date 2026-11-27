@@ -1,30 +1,30 @@
+import { testStore } from './postgres-fixture.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ReadingStore} from '../src/store.ts';
-import {buildPlan, getPreferences, setPreferences} from '../src/story-plan.ts';
-import {generateStory} from '../src/story-generation.ts';
-import {withChapterQuestions} from './quiz-fixture.ts';
+import { buildPlan,getPreferences,setPreferences } from '../src/story-plan.ts';
+import { generateStory } from '../src/story-generation.ts';
+import { withChapterQuestions } from './quiz-fixture.ts';
 
 test('an unplanned word or invalid sense never enters saved story history', async () => {
-  const store = new ReadingStore();
-  const plan = {...buildPlan(store,'easy',1),targetWords:2};
+  const store = await testStore();
+  const plan = {...await buildPlan(store,'easy',1),targetWords:2};
   for(const invalid of ['直升机:1','茶:999','我喝茶。']) {
     const candidate = {title:'Tea',chapters:[{title:'Tea',paragraphs:[[[invalid,'。']]]}]};
     let requests=0;
     await assert.rejects(generateStory(store,plan,async()=>JSON.stringify(++requests===1 ? candidate : candidate.chapters[0])),/sense.*Try again/);
     assert.equal(requests,4);
-    assert.deepEqual(store.stories().map(story=>story.id),['tea-shop']);
+    assert.deepEqual((await store.stories()).map(story=>story.id),['tea-shop']);
   }
 });
 
 test('the first generated story reopens with exact dictionary senses and budgeted targets', async () => {
-  const store = new ReadingStore();
-  assert.equal(getPreferences(store).ceilings.easy,2);
+  const store = await testStore();
+  assert.equal((await getPreferences(store)).ceilings.easy,2);
   const settings = {difficulty:'medium',ceilings:{easy:1,medium:2,hard:4}};
-  setPreferences(store,settings);
-  const plan = buildPlan(store,'easy',1);
+  await setPreferences(store,settings);
+  const plan = await buildPlan(store,'easy',1);
   assert.equal(plan.newCharacters.length,1);
-  assert.equal(getPreferences(store).difficulty,'medium');
+  assert.equal((await getPreferences(store)).difficulty,'medium');
   const word = plan.newWords[0];
   const sentence = [word+':1','。'];
   const candidate = {title:'At home',chapters:[{title:'A visit',paragraphs:[[sentence]]}]};
@@ -32,7 +32,7 @@ test('the first generated story reopens with exact dictionary senses and budgete
     assert.ok(prompt.includes(word));
     return JSON.stringify(candidate);
   }));
-  const reopened = store.story(result.id);
+  const reopened = await store.story(result.id);
   assert.deepEqual(reopened.chapters[0].translations,['Baobao is here.']);
   assert.equal(reopened.chapters[0].questions?.length,3);
   assert.deepEqual(reopened.chapters[0].questions?.[0].prompt.words,['什么']);
@@ -45,12 +45,12 @@ test('the first generated story reopens with exact dictionary senses and budgete
   assert.notEqual(result.id,'tea-shop');
 });
 
-test('story length sets chapters independently of the difficulty budget',t=>{
-  const store=new ReadingStore();
-  t.after(()=>store.db.close());
+test('story length sets chapters independently of the difficulty budget',async t=>{
+  const store=await testStore();
+
   for(const chapters of [1,2,3,4,5,6]){
     for(const [difficulty,words] of [['easy',40],['medium',80],['hard',140]] as const){
-      const plan=buildPlan(store,difficulty,chapters);
+      const plan=await buildPlan(store,difficulty,chapters);
       assert.equal(plan.chapterCount,chapters);
       assert.equal(plan.targetWords,chapters*words);
     }

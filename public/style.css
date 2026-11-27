@@ -66,3 +66,10 @@ main:has(.reader-grid){padding-top:clamp(14px,1.4vw,22px)}
 .paragraph-translation summary{width:fit-content;padding:.3rem 0;cursor:pointer;color:var(--red);font-size:.9rem}
 .paragraph-translation summary:focus-visible{outline:3px solid #af6c29;outline-offset:2px}
 .paragraph-translation[open]>div{padding:.5rem .8rem;background:#f7eddd;border-radius:.45rem;white-space:pre-line}
+
+.account-dialog { width:min(25rem,90vw); border:1px solid currentColor; border-radius:1rem; padding:2rem; color:inherit; background:#fff9ef }
+.account-dialog::backdrop { background:rgb(40 30 20 / .5) }
+.account-dialog form,.account-dialog label { display:grid; gap:.65rem }
+.account-dialog form { gap:1rem }
+.account-dialog input { padding:.6rem; font:inherit }
+.account-dialog [role=alert]:empty { display:none }

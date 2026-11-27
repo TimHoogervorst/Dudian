@@ -1,16 +1,16 @@
-import {coverTemplate} from './cover-template.ts';
-import {articleSectionsValid,bookWithCast,formatRules} from './reading-format.ts';
-import {messages} from './reading-types.ts';
-import {planWordReviews,wordReviewCards} from './word-review.ts';
+import { coverTemplate } from './cover-template.ts';
+import { articleSectionsValid,bookWithCast,formatRules } from './reading-format.ts';
+import { messages } from './reading-types.ts';
+import { planWordReviews,wordReviewCards } from './word-review.ts';
 import { randomUUID } from 'node:crypto';
 import { catalog } from './catalog.ts';
-import { type ReadingStore, type Story, type Token } from './store.ts';
-import { chapterFocus, paragraphCounts, type StoryPlan } from './story-plan.ts';
+import { type ReadingStore,type Story,type Token } from './store.ts';
+import { chapterFocus,paragraphCounts,type StoryPlan } from './story-plan.ts';
 import { generateText } from './provider.ts';
-import {generateQuestions} from './quiz-generation.ts';
-import {isTranslation} from './paragraph-translation.ts';
-import {numberSentences} from './cover-text.ts';
-import {practiceSenses,resolveStorySenses} from './story-senses.ts';
+import { generateQuestions } from './quiz-generation.ts';
+import { isTranslation } from './paragraph-translation.ts';
+import { numberSentences } from './cover-text.ts';
+import { practiceSenses,resolveStorySenses } from './story-senses.ts';
 
 export type CandidateWriter = (prompt:string) => Promise<string>;
 type Chapter = Story['chapters'][number];
@@ -262,14 +262,14 @@ function previewFor(plan:StoryPlan,chapters:Chapter[]) {
 export type GenerationStage = 'planning'|'writing'|'checking'|'revising'|'questions'|'saving';
 export async function generateStory(store:ReadingStore,plan:StoryPlan,write:CandidateWriter=generateText,
   report:(stage:GenerationStage,detail?:string)=>void=()=>{}) {
-  const story=await generateReading(plan,write,planWordReviews(store,plan),report);
+  const story=await generateReading(plan,write,await planWordReviews(store,plan),report);
   report('saving');
-  store.saveStory(story);
+  await store.saveStory(story);
   return story;
 }
 
 // Exam readings use the same writer and validation without creating a Library story.
-export async function generateReading(plan:StoryPlan,write:CandidateWriter,rounds:ReturnType<typeof planWordReviews>=[],
+export async function generateReading(plan:StoryPlan,write:CandidateWriter,rounds:Awaited<ReturnType<typeof planWordReviews>>=[],
   report:(stage:GenerationStage,detail?:string)=>void=()=>{},examTargets?:string[]){
   if(plan.characters){
     const available=[...new Set(plan.characters.available+plan.reviewWords.join(''))].join('');

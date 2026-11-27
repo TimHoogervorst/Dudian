@@ -15,6 +15,7 @@ export async function api(path,data,signal,keepalive=false) {
   const options = data===undefined ? {} : {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)};
   const res=await fetch(path,{...options,signal,keepalive});
   const result=await res.json();
+  if(res.status===401 && path!=='/api/login' && path!=='/api/register') location.reload();
   if(!res.ok) throw Error(result.error || 'Request failed.');
   return result;
 }

@@ -1,9 +1,9 @@
-import type {DatabaseSync} from 'node:sqlite';
-import {catalog,entryKind,type ItemKind} from './catalog.ts';
-import {storedExample} from './flashcard-example.ts';
-import {perfectScore} from './encounters.ts';
-import {reviewCandidates} from './strength.ts';
-import {HttpError} from './store.ts';
+import type { LearnerDatabase } from './postgres/learner-database.ts';
+import { catalog,entryKind,type ItemKind } from './catalog.ts';
+import { storedExample } from './flashcard-example.ts';
+import { perfectScore } from './encounters.ts';
+import { reviewCandidates } from './strength.ts';
+import { HttpError } from './store.ts';
 
 type Target={text:string;kind:ItemKind;pinyin:string;meaning:string;senseId?:string};
 export type Exercise={type:'choice'|'match';targets:Target[];options:string[]};
@@ -36,8 +36,8 @@ function distinct(group:Target[],item:Target){
 function pool(level:number){
   return [...catalog.libraryItems('word',level),...catalog.libraryItems('character',level)].map(i=>i.text);
 }
-export function candidates(db:DatabaseSync,level:number,excluded:string[]){
-  const scores=new Map(reviewCandidates(db,Date.now()).map(i=>[i.text,i]));
+export async function candidates(db:LearnerDatabase,level:number,excluded:string[]){
+  const scores=new Map((await reviewCandidates(db,Date.now())).map(i=>[i.text,i]));
   const skip=new Set(excluded);
   const now=Date.now();
   return shuffle(pool(level)).filter(text=>!skip.has(text)&&scores.get(text)?.score!==perfectScore).map(text=>{
@@ -66,9 +66,9 @@ function meaningChoice(text:string,alternatives:string[]):Exercise{
   return {type:'choice',targets:[item],options:shuffle(choices.map(i=>i.meaning))};
 }
 
-export function exerciseView(db:DatabaseSync,exercise:Exercise,hskLimit?:number){
+export async function exerciseView(db:LearnerDatabase,exercise:Exercise,hskLimit?:number){
   const item=exercise.targets[0];
-  const example=exercise.type==='choice'?storedExample(db,item.kind,item.text,item):undefined;
+  const example=exercise.type==='choice'?await storedExample(db,item.kind,item.text,item):undefined;
   const showExample=example&&(!hskLimit||catalog.usesCharactersThrough(example.before+example.target+example.after,hskLimit));
   return {type:exercise.type,options:exercise.options,example:showExample?example:undefined,targets:exercise.targets.map(({text,pinyin})=>({text,pinyin}))};
 }
@@ -99,13 +99,13 @@ export function planMilestoneWordPractice(level:number){
   };
 }
 
-export function planExercises(db:DatabaseSync,request:PracticeRequest,excluded:string[]=[],extension=false){
+export async function planExercises(db:LearnerDatabase,request:PracticeRequest,excluded:string[]=[],extension=false){
   const {level=1,words,kind}=request;
   if(!['word','character','mixed'].includes(kind)||!Number.isInteger(level)||level<1||level>6)
     throw new HttpError(400,'Choose a valid practice level.');
   if(words!==undefined&&(!Array.isArray(words)||!words.length||words.some(w=>typeof w!=='string'||!catalog.get(kind==='character'?'character':'word',w))))
     throw new HttpError(400,'Choose valid practice entries.');
-  const available=candidates(db,level,excluded).filter(i=>kind==='mixed'||entryKind('word',i.text)===kind);
+  const available=(await candidates(db,level,excluded)).filter(i=>kind==='mixed'||entryKind('word',i.text)===kind);
   const ranked=available.sort((a,b)=>a.score-b.score||a.due-b.due);
   const due=ranked.filter(i=>Number.isFinite(i.due)).sort((a,b)=>a.due-b.due);
   const remaining=new Set(words??(extension?due:ranked).map(i=>i.text));

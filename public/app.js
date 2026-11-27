@@ -1,5 +1,6 @@
 import {ui,el,link,api,pageNavigation} from './ui.js';
 import {reader} from './reader.js';
+import {signIn} from './account.js';
 import {icon} from './icons.js';
 const root=document.querySelector('main');
 const nav=document.querySelector('#nav');
@@ -40,6 +41,12 @@ async function render() {
 }
 window.addEventListener('unhandledrejection',e=>{ui.notice(e.reason?.message||'The action could not be completed.');});
 try {
+  const username=await signIn();
+  const logout=el('button','Log out');
+  logout.type='button';
+  logout.setAttribute('aria-label','Log out of '+username);
+  logout.onclick=async()=>{await api('/api/logout',{});location.reload();};
+  nav.append(logout);
   const assets=await api('/api/features');
   for(const name of assets.css){ const l=document.createElement('link');l.rel='stylesheet';l.href='/features/'+encodeURIComponent(name);document.head.append(l); }
   for(const name of assets.js){const module=await import('/features/'+encodeURIComponent(name));await module.setup?.(ui);}

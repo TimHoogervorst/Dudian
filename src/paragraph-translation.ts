@@ -1,5 +1,5 @@
-import {generateText} from './provider.ts';
-import {HttpError,type ReadingStore} from './store.ts';
+import { generateText } from './provider.ts';
+import { HttpError,type ReadingStore } from './store.ts';
 
 export function isTranslation(value:unknown):value is string{
   return typeof value==='string' && /[a-z]/i.test(value) && value.length<=12000;
@@ -9,7 +9,7 @@ const pending=new WeakMap<ReadingStore,Map<string,Promise<string>>>();
 
 export async function paragraphTranslation(store:ReadingStore,id:string,chapter:number,paragraph:number,write=generateText){
   if(!Number.isInteger(chapter)||!Number.isInteger(paragraph))throw new HttpError(400,'Choose a paragraph in this story.');
-  const section=store.story(id).chapters[chapter];
+  const section=(await store.story(id)).chapters[chapter];
   const tokens=section?.paragraphs[paragraph];
   if(!tokens)
     throw new HttpError(400,'Choose a paragraph in this story.');
@@ -28,11 +28,14 @@ export async function paragraphTranslation(store:ReadingStore,id:string,chapter:
     if(!isTranslation(result))throw new HttpError(502,'No English translation was returned. Try again.');
     const english=result.trim();
     // Merge into the latest chapter so concurrent reveals of different paragraphs both persist.
-    const latest=store.story(id).chapters[chapter];
-    const translations=latest.translations??Array(latest.paragraphs.length).fill(null);
-    translations[paragraph]=english;
-    store.db.prepare('UPDATE stories SET content=json_set(content,?,json(?)) WHERE id=?')
-      .run('$.chapters['+chapter+'].translations',JSON.stringify(translations),id);
+    await store.db.transaction(async()=>{
+      await store.db.prepare('SELECT id FROM stories WHERE id=$1 FOR UPDATE').get(id);
+      const latest=(await store.story(id)).chapters[chapter];
+      const translations=latest.translations??Array(latest.paragraphs.length).fill(null);
+      translations[paragraph]=english;
+      await store.db.prepare('UPDATE stories SET content=jsonb_set(content,$1::text[],$2::jsonb) WHERE id=$3')
+        .run(['chapters',String(chapter),'translations'],JSON.stringify(translations),id);
+    });
     return english;
   })();
   requests.set(key,request);

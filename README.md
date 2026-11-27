@@ -16,9 +16,15 @@ cd Dudian
 docker compose up -d --build
 ```
 
-Open [Dudian](http://localhost:3000) to try the included story. To generate your own, choose **Settings → Continue with ChatGPT** on the computer running Docker. [Connection and cover artwork setup](docs/chatgpt-connection.md)
+Open [Dudian](http://localhost:3000) and create an account with a username and password. Sign in with the same account on another device to resume reading. All learners share the story catalog. Bookmarks, word strength, practice sessions, and reading history belong to each account. To enable generation, connect the host from **Settings → Continue with ChatGPT**. Each request uses its learner’s selected focus and waits in the generation queue. [Connection and cover artwork setup](docs/chatgpt-connection.md)
 
-To stop the app, run `docker compose down`. Your stories and progress stay in the Docker volume.
+To stop the app, run `docker compose down`. PostgreSQL keeps stories and progress in the `postgres-data` volume. The `reader-data` volume holds the host’s provider connection.
+
+## Development
+
+The browser UI lives in `public/`. The TypeScript HTTP server in `src/` authenticates requests, accesses PostgreSQL, and processes generation jobs. Compose keeps the database on its internal network. For native development, set `DATABASE_URL` to a PostgreSQL database whose setup user can create the tables and the `dudian_learner` role.
+
+Run `npm ci` and `npm run typecheck`. Set `TEST_DATABASE_URL` to a PostgreSQL test database and run `npm test`. Integration tests create and remove isolated schemas.
 
 ## Inside the reader
 

@@ -1,6 +1,6 @@
-import type {DatabaseSync} from 'node:sqlite';
-import {catalog} from './catalog.ts';
-import {hskReadingProgress,reachedLevel} from './strength.ts';
+import type { LearnerDatabase } from './postgres/learner-database.ts';
+import { catalog } from './catalog.ts';
+import { hskReadingProgress,reachedLevel } from './strength.ts';
 
 // Fraction of the level completed, desired character coverage, minimum selection probability.
 const coverageCheckpoints=[
@@ -21,19 +21,20 @@ export function unseenFocusChance(progress:number,coverage:number){
   return 1;
 }
 
-export function nextTestLevel(db:DatabaseSync){
-  return Number(db.prepare("SELECT coalesce(max(level),0)+1 AS level FROM milestone_passes").get()!.level);
+export async function nextTestLevel(db:LearnerDatabase){
+  return Number((await db.prepare("SELECT coalesce(max(level),0)+1 AS level FROM milestone_passes").get())!.level);
 }
 
-export function unseenCharacters(db:DatabaseSync,level:number){
-  const seen=new Set(db.prepare('SELECT text FROM milestone_characters').all().map(row=>row.text));
+export async function unseenCharacters(db:LearnerDatabase,level:number){
+  const seen=new Set((await db.prepare('SELECT text FROM milestone_characters').all()).map(row=>row.text));
   return catalog.libraryItems('character',level).map(item=>item.text).filter(text=>!seen.has(text));
 }
 
-export function milestoneProgress(db:DatabaseSync,raw=hskReadingProgress(db)){
-  const level=nextTestLevel(db);
-  const reached=reachedLevel(db,raw);
+export async function milestoneProgress(db:LearnerDatabase,raw?:number){
+  raw ??= await hskReadingProgress(db);
+  const level=await nextTestLevel(db);
+  const reached=await reachedLevel(db,raw);
   const milestone=level<=reached?level:null;
-  const attempt=milestone?db.prepare("SELECT id,status FROM milestone_tests WHERE level=? AND status IN ('ready','active')").get(level):null;
+  const attempt=milestone?await db.prepare("SELECT id,status FROM milestone_tests WHERE level=$1 AND status IN ('ready','active')").get(level):null;
   return {level:Math.min(raw,level),passed:level-1,milestone,attempt};
 }

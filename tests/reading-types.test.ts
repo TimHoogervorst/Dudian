@@ -1,11 +1,11 @@
-import {articleSectionsValid} from '../src/reading-format.ts';
+import { testStore } from './postgres-fixture.ts';
+import { articleSectionsValid } from '../src/reading-format.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {ReadingStore} from '../src/store.ts';
-import {generateStory} from '../src/story-generation.ts';
-import {confirmedPlan,practicePreview} from '../src/practice-preview.ts';
-import {articleDocuments,progression,readingOptions,type ReadingFormat} from '../src/reading-types.ts';
-import type {StoryPlan} from '../src/story-plan.ts';
+import { generateStory } from '../src/story-generation.ts';
+import { confirmedPlan,practicePreview } from '../src/practice-preview.ts';
+import { articleDocuments,progression,readingOptions,type ReadingFormat } from '../src/reading-types.ts';
+import type { StoryPlan } from '../src/story-plan.ts';
 
 test('milestones, book stages and document pools agree at inclusive boundaries',()=>{
   for(const [level,unlocked] of [[0,3],[0.199,3],[0.2,4],[0.5,5],[1,7],[2,10],[3,11]]){
@@ -28,19 +28,19 @@ test('letters require one greeting, the selected number of body paragraphs, and 
   }
 });
 
-test('the preview pins the participant count and supports an open subject',t=>{
-  const store=new ReadingStore();
-  t.after(()=>store.db.close());
-  const first=practicePreview(store,{difficulty:'easy',chapterCount:1,type:'dialogue'});
-  const next=practicePreview(store,{difficulty:'medium',chapterCount:2,type:'dialogue',previewId:first.id});
+test('the preview pins the participant count and supports an open subject',async t=>{
+  const store=await testStore();
+
+  const first=await practicePreview(store,{difficulty:'easy',chapterCount:1,type:'dialogue'});
+  const next=await practicePreview(store,{difficulty:'medium',chapterCount:2,type:'dialogue',previewId:first.id});
   const plan=confirmedPlan(store,next.id,'medium',2,'open');
   assert.deepEqual(plan.format,{type:'dialogue',people:first.options.people});
   assert.equal(plan.subject,undefined);
 });
 
 test('chat, recipe and baby book content survives generation, questions and storage',async t=>{
-  const store=new ReadingStore();
-  t.after(()=>store.db.close());
+  const store=await testStore();
+
   const formats:ReadingFormat[]=[{type:'dialogue',people:5},{type:'article',documents:['Recipe']},{type:'book',stage:'Baby book'}];
   for(const format of formats){
     const plan:StoryPlan={format,difficulty:'easy',chapterCount:1,targetWords:40,ceiling:0,
@@ -64,7 +64,7 @@ test('chat, recipe and baby book content survives generation, questions and stor
       return JSON.stringify({title:'Tea',teaser:['茶:1','。'],chapters:[invalid]});
     });
     assert.equal(drafts,format.type==='book'?1:2);
-    const saved=store.story(result.id);
+    const saved=await store.story(result.id);
     assert.deepEqual(saved.format,format);
     assert.deepEqual(saved.chapters[0].speakers,chapter.speakers);
     assert.deepEqual(saved.chapters[0].sections,chapter.sections);

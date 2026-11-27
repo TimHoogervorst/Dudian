@@ -1,16 +1,16 @@
-import {randomUUID,randomInt} from 'node:crypto';
-import type {DatabaseSync} from 'node:sqlite';
-import {catalog} from './catalog.ts';
-import {HttpError} from './store.ts';
-import {generateText} from './provider.ts';
-import {milestoneProgress} from './milestone-progress.ts';
-import {exerciseView,planMilestoneWordPractice,type Exercise} from './practice-exercises.ts';
+import { randomUUID,randomInt } from 'node:crypto';
+import type { LearnerDatabase } from './postgres/learner-database.ts';
+import { catalog } from './catalog.ts';
+import { HttpError } from './store.ts';
+import { generateText } from './provider.ts';
+import { milestoneProgress } from './milestone-progress.ts';
+import { exerciseView,planMilestoneWordPractice,type Exercise } from './practice-exercises.ts';
 
-import {generateReading} from './story-generation.ts';
-import {readingSize} from './story-plan.ts';
-import {articleDocuments,milestones,readingOptions,type ReadingFormat} from './reading-types.ts';
-import {dictionaryTokens} from './cover-text.ts';
-import type {QuizText,Token} from './store.ts';
+import { generateReading } from './story-generation.ts';
+import { readingSize } from './story-plan.ts';
+import { articleDocuments,milestones,readingOptions,type ReadingFormat } from './reading-types.ts';
+import { dictionaryTokens } from './cover-text.ts';
+import type { QuizText,Token } from './store.ts';
 
 type Word=Pick<Token,'text'|'pinyin'>;
 type Line=Word & {tokens?:Word[]};
@@ -81,16 +81,16 @@ function displayLine(line:Line){
 }
 
 type PreparationJob={completed:number;work:Promise<string>};
-const jobs=new WeakMap<DatabaseSync,Map<number,PreparationJob>>();
-const failures=new WeakMap<DatabaseSync,Set<number>>();
-function active(db:DatabaseSync,level:number){
-  return db.prepare("SELECT id,status FROM milestone_tests WHERE level=? AND status IN ('ready','active')").get(level);
+const jobs=new WeakMap<LearnerDatabase,Map<number,PreparationJob>>();
+const failures=new WeakMap<LearnerDatabase,Set<number>>();
+async function active(db:LearnerDatabase,level:number){
+  return await db.prepare("SELECT id,status FROM milestone_tests WHERE level=$1 AND status IN ('ready','active')").get(level);
 }
-export async function generateTest(db:DatabaseSync,level:number,generate=generateText){
+export async function generateTest(db:LearnerDatabase,level:number,generate=generateText){
   if(!Number.isInteger(level)||level<1||level>6)throw new HttpError(400,'Choose an HSK level from 1 to 6.');
-  const progress=milestoneProgress(db);
+  const progress=await milestoneProgress(db);
   if(level>progress.passed&&progress.milestone!==level)throw new HttpError(409,'Complete the milestone requirements first.');
-  const current=active(db,level);
+  const current=await active(db,level);
   if(current)return String(current.id);
   const pending=jobs.get(db)??new Map<number,PreparationJob>();
   jobs.set(db,pending);
@@ -99,28 +99,28 @@ export async function generateTest(db:DatabaseSync,level:number,generate=generat
   const failed=failures.get(db)??new Set<number>();
   failures.set(db,failed);
   failed.delete(level);
-  const work=generateSections(level,generate,completed=>{job.completed=completed;}).then(sections=>{
-    db.prepare("INSERT OR IGNORE INTO milestone_tests(id,level,status,sections) VALUES(?,?,'ready',?)").run(randomUUID(),level,JSON.stringify(sections));
-    return String(active(db,level)!.id);
+  const work=generateSections(level,generate,completed=>{job.completed=completed;}).then(async sections=>{
+    await db.prepare("INSERT INTO milestone_tests(id,level,status,sections) VALUES($1,$2,'ready',$3) ON CONFLICT DO NOTHING").run(randomUUID(),level,JSON.stringify(sections));
+    return String((await active(db,level))!.id);
   }).catch(error=>{failed.add(level);throw error;}).finally(()=>pending.delete(level));
   const job:PreparationJob={completed:0,work};
   pending.set(level,job);
   return work;
 }
-export function prepareMilestones(db:DatabaseSync,generate=generateText){
-  const progress=milestoneProgress(db);
+export async function prepareMilestones(db:LearnerDatabase,generate=generateText){
+  const progress=await milestoneProgress(db);
   const levels=Array.from({length:progress.passed},(_,i)=>i+1);
   if(progress.milestone)levels.push(progress.milestone);
   for(const level of levels){
-    if(!active(db,level)&&!jobs.get(db)?.has(level)&&!failures.get(db)?.has(level))void generateTest(db,level,generate).catch(()=>{});
+    if(!await active(db,level)&&!jobs.get(db)?.has(level)&&!failures.get(db)?.has(level))void generateTest(db,level,generate).catch(()=>{});
   }
 }
-export function preparation(db:DatabaseSync,level:number){
+export async function preparation(db:LearnerDatabase,level:number){
   const job=jobs.get(db)?.get(level);
-  return {completed:job?.completed??0,total:passageKinds.length,attempt:active(db,level),failed:failures.get(db)?.has(level)??false};
+  return {completed:job?.completed??0,total:passageKinds.length,attempt:await active(db,level),failed:failures.get(db)?.has(level)??false};
 }
-function load(db:DatabaseSync,id:string){
-  const row=db.prepare('SELECT * FROM milestone_tests WHERE id=?').get(id);
+async function load(db:LearnerDatabase,id:string){
+  const row=await db.prepare('SELECT * FROM milestone_tests WHERE id=$1').get(id);
   if(!row)throw new HttpError(404,'Milestone test not found.');
   return {id,level:Number(row.level),status:String(row.status),position:Number(row.position),
     sections:JSON.parse(String(row.sections)) as Section[],answers:JSON.parse(String(row.answers)) as Submitted[]};
@@ -131,7 +131,7 @@ function items(section:Section,task:number){
   const e=section.exercises[task];
   return e.targets.map(t=>({text:t.text,options:e.options,meaning:t.meaning}));
 }
-function grade(a:ReturnType<typeof load>){
+function grade(a:Awaited<ReturnType<typeof load>>){
   const review=a.sections.flatMap((s,section)=>Array.from({length:s.questions.length+s.exercises.length},(_,task)=>{
     const draft=a.answers.find(d=>d.section===section&&d.task===task);
     return items(s,task).flatMap(({text,options,meaning},i)=>{
@@ -147,47 +147,51 @@ function grade(a:ReturnType<typeof load>){
   }
   return {review,reading,practice,unanswered:reading.unanswered+practice.unanswered,mistakes:reading.mistakes+practice.mistakes};
 }
-export function testView(db:DatabaseSync,id:string){
-  const a=load(db,id);
+export async function testView(db:LearnerDatabase,id:string){
+  const a=await load(db,id);
   const view={id,level:a.level,status:a.status,position:a.position,answers:a.answers,
-    practiceRetake:a.status==='active'&&!!db.prepare('SELECT 1 FROM milestone_passes WHERE level=?').get(a.level),
-    sections:a.sections.map(s=>({kind:s.kind,title:s.title,lines:s.lines.map(displayLine),names:s.names,speakers:s.speakers,sections:s.sections,
+    practiceRetake:a.status==='active'&&!!await db.prepare('SELECT 1 FROM milestone_passes WHERE level=$1').get(a.level),
+    sections:await Promise.all(a.sections.map(async s=>({kind:s.kind,title:s.title,lines:s.lines.map(displayLine),names:s.names,speakers:s.speakers,sections:s.sections,
       tasks:[...s.questions.map(q=>({prompt:displayLine(q.prompt),targets:[],options:q.choices.map(displayLine)})),
-        ...s.exercises.map(e=>({prompt:null,...exerciseView(db,e,a.level)}))]}))};
+        ...await Promise.all(s.exercises.map(async e=>({prompt:null,...await exerciseView(db,e,a.level)})))]})))};
   if(a.status==='failed'||a.status==='passed')return {...view,...grade(a)};
   return view;
 }
-export function startTest(db:DatabaseSync,id:string){
-  db.prepare("UPDATE milestone_tests SET status='active',position=-1 WHERE id=? AND status='ready'").run(id);
-  return testView(db,id);
+export async function startTest(db:LearnerDatabase,id:string){
+  await db.prepare("UPDATE milestone_tests SET status='active',position=-1 WHERE id=$1 AND status='ready'").run(id);
+  return await testView(db,id);
 }
-export function saveDraft(db:DatabaseSync,id:string,section:number,task?:number,answers?:number[]){
-  const a=load(db,id);
-  if(a.status!=='active')throw new HttpError(409,'This test is closed.');
-  if(!Number.isInteger(section)||section< -1||section>a.sections.length)throw new HttpError(400,'Unknown section.');
-  if(task!==undefined){
-    const s=a.sections[section];
-    if(!s||!Number.isInteger(task)||task<0||task>=s.questions.length+s.exercises.length)throw new HttpError(400,'Unknown question.');
-    const rows=items(s,task);
-    if(!Array.isArray(answers)||answers.length!==rows.length||answers.some((v,i)=>!Number.isInteger(v)||v< -1||v>=rows[i].options.length))
-      throw new HttpError(400,'Invalid answer.');
-    const filled=answers.filter(v=>v>=0);
-    if(new Set(filled).size!==filled.length)throw new HttpError(400,'Choose a distinct meaning for each word.');
-    a.answers=a.answers.filter(d=>d.section!==section||d.task!==task);
-    a.answers.push({section,task,answers});
-  }
-  db.prepare('UPDATE milestone_tests SET position=?,answers=? WHERE id=?').run(section,JSON.stringify(a.answers),id);
+export async function saveDraft(db:LearnerDatabase,id:string,section:number,task?:number,answers?:number[]){
+  return db.transaction(async()=>{
+    const a=await load(db,id);
+    if(a.status!=='active')throw new HttpError(409,'This test is closed.');
+    if(!Number.isInteger(section)||section< -1||section>a.sections.length)throw new HttpError(400,'Unknown section.');
+    if(task!==undefined){
+      const s=a.sections[section];
+      if(!s||!Number.isInteger(task)||task<0||task>=s.questions.length+s.exercises.length)throw new HttpError(400,'Unknown question.');
+      const rows=items(s,task);
+      if(!Array.isArray(answers)||answers.length!==rows.length||answers.some((v,i)=>!Number.isInteger(v)||v< -1||v>=rows[i].options.length))
+        throw new HttpError(400,'Invalid answer.');
+      const filled=answers.filter(v=>v>=0);
+      if(new Set(filled).size!==filled.length)throw new HttpError(400,'Choose a distinct meaning for each word.');
+      a.answers=a.answers.filter(d=>d.section!==section||d.task!==task);
+      a.answers.push({section,task,answers});
+    }
+    await db.prepare('UPDATE milestone_tests SET position=$1,answers=$2 WHERE id=$3').run(section,JSON.stringify(a.answers),id);
+  });
 }
-export function submitTest(db:DatabaseSync,id:string){
-  const a=load(db,id);
-  if(a.status==='ready')throw new HttpError(409,'Start this test first.');
-  if(a.status==='active'){
-    const {reading,practice,mistakes,unanswered}=grade(a);
-    const passed=unanswered===0&&reading.mistakes<=3&&practice.mistakes<=3;
-    db.prepare('UPDATE milestone_tests SET status=?,mistakes=? WHERE id=?').run(passed?'passed':'failed',mistakes,id);
-  }
-  return testView(db,id);
+export async function submitTest(db:LearnerDatabase,id:string){
+  return db.transaction(async()=>{
+    const a=await load(db,id);
+    if(a.status==='ready')throw new HttpError(409,'Start this test first.');
+    if(a.status==='active'){
+      const {reading,practice,mistakes,unanswered}=grade(a);
+      const passed=unanswered===0&&reading.mistakes<=3&&practice.mistakes<=3;
+      await db.prepare('UPDATE milestone_tests SET status=$1,mistakes=$2 WHERE id=$3').run(passed?'passed':'failed',mistakes,id);
+    }
+    return await testView(db,id);
+  });
 }
-export function discardTest(db:DatabaseSync,id:string){
-  db.prepare('DELETE FROM milestone_tests WHERE id=?').run(id);
+export async function discardTest(db:LearnerDatabase,id:string){
+  await db.prepare('DELETE FROM milestone_tests WHERE id=$1').run(id);
 }

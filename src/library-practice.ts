@@ -1,69 +1,59 @@
-import {randomUUID} from 'node:crypto';
-import type {DatabaseSync} from 'node:sqlite';
-import {ensureReviewSchema,readSession,recordReview} from './flashcards.ts';
-import {candidates,checkExercise,exerciseView,planExercises,type Exercise,type PracticeRequest} from './practice-exercises.ts';
-import {HttpError} from './store.ts';
-import {strengthFor,adjustStrength} from './strength.ts';
-import {seeItem} from './encounters.ts';
+import { randomUUID } from 'node:crypto';
+import type { LearnerDatabase } from './postgres/learner-database.ts';
+import { readSession,recordReview } from './flashcards.ts';
+import { candidates,checkExercise,exerciseView,planExercises,type Exercise,type PracticeRequest } from './practice-exercises.ts';
+import { HttpError } from './store.ts';
+import { strengthFor,adjustStrength } from './strength.ts';
+import { seeItem } from './encounters.ts';
 
-function schema(db:DatabaseSync){
-  ensureReviewSchema(db);
-  db.exec(`CREATE TABLE IF NOT EXISTS practice_sets(
-    id TEXT PRIMARY KEY REFERENCES flashcard_sessions(id), request TEXT NOT NULL, exercises TEXT NOT NULL,
-    excluded TEXT NOT NULL, answers TEXT NOT NULL DEFAULT '[]', parent TEXT UNIQUE REFERENCES practice_sets(id))`);
-}
-function load(db:DatabaseSync,id:string){
-  schema(db);
-  const row=db.prepare('SELECT * FROM practice_sets WHERE id=?').get(id);
+async function load(db:LearnerDatabase,id:string){
+
+  const row=await db.prepare('SELECT * FROM practice_sets WHERE id=$1').get(id);
   if(!row)throw new HttpError(404,'Practice set not found.');
   return {id,request:JSON.parse(String(row.request)) as PracticeRequest,exercises:JSON.parse(String(row.exercises)) as Exercise[],
     excluded:JSON.parse(String(row.excluded)) as string[],answers:JSON.parse(String(row.answers)) as number[][]};
 }
-function insert(db:DatabaseSync,request:PracticeRequest,excluded:string[],parent:string|null){
-  const exercises=planExercises(db,request,excluded,parent!==null);
+async function insert(db:LearnerDatabase,request:PracticeRequest,excluded:string[],parent:string|null){
+  const exercises=await planExercises(db,request,excluded,parent!==null);
   const id=randomUUID();
   // The history table shares its session identity with saved flashcard reviews.
-  db.prepare("INSERT INTO flashcard_sessions(id,kind,deck) VALUES(?,?,'[]')").run(id,request.kind);
-  db.prepare('INSERT INTO practice_sets(id,request,exercises,excluded,parent) VALUES(?,?,?,?,?)')
+  await db.prepare("INSERT INTO flashcard_sessions(id,kind,deck) VALUES($1,$2,'[]')").run(id,request.kind);
+  await db.prepare('INSERT INTO practice_sets(id,request,exercises,excluded,parent) VALUES($1,$2,$3,$4,$5)')
     .run(id,JSON.stringify(request),JSON.stringify(exercises),JSON.stringify(excluded),parent);
-  return practiceView(db,id);
+  return await practiceView(db,id);
 }
-function transaction<T>(db:DatabaseSync,write:()=>T){
-  db.exec('BEGIN IMMEDIATE');
-  try{const value=write();db.exec('COMMIT');return value;}
-  catch(error){db.exec('ROLLBACK');throw error;}
+
+export function startPractice(db:LearnerDatabase,request:PracticeRequest){
+
+  return db.transaction(async ()=>await insert(db,request,[],null));
 }
-export function startPractice(db:DatabaseSync,request:PracticeRequest){
-  schema(db);
-  return transaction(db,()=>insert(db,request,[],null));
-}
-function visited(set:ReturnType<typeof load>){
+function visited(set:Awaited<ReturnType<typeof load>>){
   return [...set.excluded,...set.exercises.flatMap(ex=>ex.targets.map(t=>t.text))];
 }
-export function practiceView(db:DatabaseSync,id:string){
-  const set=load(db,id);
+export async function practiceView(db:LearnerDatabase,id:string){
+  const set=await load(db,id);
   const index=set.answers.length;
   const current=set.exercises[index];
-  const exercise=current?exerciseView(db,current):null;
-  const remainingDue=!current&&!set.request.words?candidates(db,set.request.level??1,visited(set))
+  const exercise=current?await exerciseView(db,current):null;
+  const remainingDue=!current&&!set.request.words?(await candidates(db,set.request.level??1,visited(set)))
     .filter(i=>Number.isFinite(i.due)&&(set.request.kind==='mixed'||set.request.kind===(Array.from(i.text).length===1?'character':'word'))).length:0;
   const testedTargets=current?[]:set.exercises.flatMap(ex=>ex.targets);
   return {id,index,total:set.exercises.length,kind:set.request.kind,exercise,remainingDue,
-    results:current?undefined:readSession(db,id).results?.map((row,i)=>({...row,pinyin:testedTargets[i].pinyin}))};
+    results:current?undefined:(await readSession(db,id)).results?.map((row,i)=>({...row,pinyin:testedTargets[i].pinyin}))};
 }
-export function extendPractice(db:DatabaseSync,id:string){
-  return transaction(db,()=>{
-    const parent=load(db,id);
-    const child=db.prepare('SELECT id FROM practice_sets WHERE parent=?').get(id);
-    if(child)return practiceView(db,String(child.id));
-    if(parent.request.words||parent.answers.length!==parent.exercises.length||!practiceView(db,id).remainingDue)
+export function extendPractice(db:LearnerDatabase,id:string){
+  return db.transaction(async ()=>{
+    const parent=await load(db,id);
+    const child=await db.prepare('SELECT id FROM practice_sets WHERE parent=$1').get(id);
+    if(child)return await practiceView(db,String(child.id));
+    if(parent.request.words||parent.answers.length!==parent.exercises.length||!(await practiceView(db,id)).remainingDue)
       throw new HttpError(409,'No further overdue items in this set.');
-    return insert(db,parent.request,visited(parent),id);
+    return await insert(db,parent.request,visited(parent),id);
   });
 }
-export function submitPractice(db:DatabaseSync,id:string,index:number,answers:number[],zone='UTC'){
-  return transaction(db,()=>{
-    const set=load(db,id);
+export function submitPractice(db:LearnerDatabase,id:string,index:number,answers:number[],zone='UTC'){
+  return db.transaction(async ()=>{
+    const set=await load(db,id);
     const exercise=set.exercises[index];
     if(!Number.isInteger(index)||!exercise||index>set.answers.length)throw new HttpError(409,'Reopen the current exercise.');
     const feedback=checkExercise(exercise,answers);
@@ -74,16 +64,16 @@ export function submitPractice(db:DatabaseSync,id:string,index:number,answers:nu
       catch{throw new HttpError(400,'Unknown time zone.');}
       const offset=set.answers.reduce((sum,row)=>sum+row.length,0);
       const now=Date.now();
-      exercise.targets.forEach(({kind,text},i)=>{
+      for (const [i,{kind,text}] of exercise.targets.entries()) {
         const correct=feedback[i].correct;
-        const before=strengthFor(db,kind,text).score??0;
-        seeItem(db,text,now,true);
-        const after=adjustStrength(db,kind,text,correct?0.5:-0.5,now);
-        recordReview(db,id,offset+i,kind,text,correct?'correct':'incorrect',now,(after.score??0)-before);
-      });
+        const before=(await strengthFor(db,kind,text)).score??0;
+        await seeItem(db,text,now,true);
+        const after=await adjustStrength(db,kind,text,correct?0.5:-0.5,now);
+        await recordReview(db,id,offset+i,kind,text,correct?'correct':'incorrect',now,(after.score??0)-before);
+      }
       set.answers.push(answers);
-      db.prepare('UPDATE practice_sets SET answers=? WHERE id=?').run(JSON.stringify(set.answers),id);
+      await db.prepare('UPDATE practice_sets SET answers=$1 WHERE id=$2').run(JSON.stringify(set.answers),id);
     }
-    return {feedback,next:practiceView(db,id)};
+    return {feedback,next:await practiceView(db,id)};
   });
 }

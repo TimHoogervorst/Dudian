@@ -1,17 +1,16 @@
-import type {ReadingStore} from './store.ts';
-import {activeMillis,ensureActivity} from './activity.ts';
-import {ensureCompletions} from './completion.ts';
+import type { ReadingStore } from './store.ts';
+import { activeMillis } from './activity.ts';
 
-export function targetWordCount(store:ReadingStore,minutes:number) {
+export async function targetWordCount(store:ReadingStore,minutes:number) {
   const {db}=store;
-  ensureActivity(db);ensureCompletions(db);
+
   const samples:number[]=[];
-  const completed=db.prepare(`SELECT c.story_id,c.chapter,c.at,c.word_count FROM chapter_completions c
+  const completed=await db.prepare(`SELECT c.story_id,c.chapter,c.at,c.word_count FROM chapter_completions c
     WHERE c.word_count>0 AND EXISTS (SELECT 1 FROM reading_intervals r WHERE r.story_id=c.story_id AND r.chapter=c.chapter AND r.start<c.at)
     ORDER BY c.at DESC LIMIT 30`).all();
-  const intervals=db.prepare('SELECT start,end FROM reading_intervals WHERE story_id=? AND chapter=? AND start<?');
+  const intervals=db.prepare('SELECT start,"end" FROM reading_intervals WHERE story_id=$1 AND chapter=$2 AND start<$3');
   for (const chapter of completed){
-    const spans=intervals.all(chapter.story_id,chapter.chapter,chapter.at)
+    const spans=(await intervals.all(chapter.story_id,chapter.chapter,chapter.at))
       .map(row=>({start:Number(row.start),end:Math.min(Number(row.end),Number(chapter.at))}));
     const time=activeMillis(spans);
     if(time<15000)continue;
